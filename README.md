@@ -3,7 +3,7 @@ Starlight (beta)
 Fabric mod for completely rewriting the vanilla light engine.
 
 ## Results
-![Starlight crushing all](https://i.imgur.com/D90AY4t.png)
+![Starlight crushing all](https://i.imgur.com/gUHxhUZ.png)
 - seed: `vanillakekw`
 - CPU: Intel i7-8750H @ 2.20GHz (Turboboost disabled)
 - Benchmark 101x101 chunks syncloaded centered at (0,0), Warmup 101x101 chunks syncloaded centered at (-10000, -10000)
