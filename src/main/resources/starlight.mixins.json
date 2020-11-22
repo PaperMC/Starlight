@@ -1,0 +1,24 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "ca.spottedleaf.starlight.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "common.blockstate.AbstractBlockStateMixin",
+    "common.chunk.ChunkMixin",
+    "common.chunk.ChunkSectionMixin",
+    "common.chunk.EmptyChunkMixin",
+    "common.chunk.ProtoChunkMixin",
+    "common.chunk.ReadOnlyChunkMixin",
+    "common.chunk.ThreadedAnvilChunkStorageMixin",
+    "common.chunk.WorldChunkMixin",
+    "common.lightengine.LightingProviderMixin",
+    "common.lightengine.ServerLightingProviderMixin",
+    "common.world.ChunkSerializerMixin"
+  ],
+  "client": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "starlight",
+  "version": "${version}",
+  "name": "Starlight",
+  "description": "Rewrites the light engine to fix lighting performance and lighting errors",
+  "authors": [
+    "Spottedleaf"
+  ],
+  "contact": {},
+  "license": "LGPL-3.0-only",
+  "icon": "assets/starlight/icon.png",
+  "environment": "*",
+  "entrypoints": {},
+  "mixins": [
+    "starlight.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.10.6+build.214",
+    "minecraft": "1.16.4"
+  }
+}
