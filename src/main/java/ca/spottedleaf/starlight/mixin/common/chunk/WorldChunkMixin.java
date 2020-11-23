@@ -55,7 +55,6 @@ public abstract class WorldChunkMixin implements NibbledChunk, Chunk {
     public void onTransitionToFull(World world, ProtoChunk protoChunk, CallbackInfo ci) {
         this.setBlockNibbles(((NibbledChunk)protoChunk).getBlockNibbles());
         this.setSkyNibbles(((NibbledChunk)protoChunk).getSkyNibbles());
-        this.setWasLoadedFromDisk(((NibbledChunk)protoChunk).wasLoadedFromDisk());
     }
 
     @Inject(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/world/biome/source/BiomeArray;Lnet/minecraft/world/chunk/UpgradeData;Lnet/minecraft/world/TickScheduler;Lnet/minecraft/world/TickScheduler;J[Lnet/minecraft/world/chunk/ChunkSection;Ljava/util/function/Consumer;)V", at = @At("TAIL"))
