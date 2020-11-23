@@ -3,7 +3,7 @@ Starlight (beta)
 Fabric mod for completely rewriting the vanilla light engine.
 
 ## Results
-![Starlight crushing all](https://i.imgur.com/gUHxhUZ.png)
+![Starlight crushing all](https://i.imgur.com/6OcuyJX.png)
 - seed: `vanillakekw`
 - CPU: Intel i7-8750H @ 2.20GHz (Turboboost disabled)
 - Benchmark 101x101 chunks syncloaded centered at (0,0), Warmup 101x101 chunks syncloaded centered at (-10000, -10000)
@@ -11,15 +11,10 @@ Fabric mod for completely rewriting the vanilla light engine.
   very simple CPU thread time measuring via [visualvm](https://visualvm.github.io/).
 - Starlight implementation was tested on [Tuinity](https://github.com/Spottedleaf/Tuinity/tree/dev/lighting) 
 
-The data shows everything we need to know. Starlight took ~8 seconds to generate the light,
-while Paper's light engine took ~300 seconds. Phosphor took ~170s. Compared to the best
-mod available, Starlight is about 20 times faster at generating light for chunks - and 
-about 40 times faster than the vanilla light engine.
-
-When loading the data off of disk, Paper took 11.78s. (Same test as above, except that save data was kept)
-Yup, this light engine can generate light data for chunks faster than Vanilla can LOAD them.
-Phosphor improves this to be approximately ~5.5s, but that's hardly an improvement when you consider
-the data already exists. 
+The data shows everything we need to know. Starlight took ~7 seconds to generate the light,
+while Vanilla's light engine took ~220s seconds. Phosphor took ~170s. Compared to the best
+mod available (Phosphor), Starlight is about 25 times faster at generating light for chunks - and 
+about 35 times faster than the vanilla light engine.
 
 Starlight will relight vanilla lit chunks due to a difference in how sky light is managed, however
 the **new lighting data is completely compatible with the vanilla light engine, meaning you can load a world in 
