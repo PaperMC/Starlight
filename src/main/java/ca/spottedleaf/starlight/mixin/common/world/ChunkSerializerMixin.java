@@ -139,7 +139,5 @@ public abstract class ChunkSerializerMixin {
 
         ((NibbledChunk)ret).setBlockNibbles(blockNibbles);
         ((NibbledChunk)ret).setSkyNibbles(skyNibbles);
-        // make sure the light engine knows we loaded from disk so we can properly handle chunk edges
-        ((NibbledChunk)ret).setWasLoadedFromDisk(true);
     }
 }

@@ -25,14 +25,11 @@ public abstract class ProtoChunkMixin implements NibbledChunk, Chunk {
     private volatile SWMRNibbleArray[] blockNibbles;
     @Unique
     private volatile SWMRNibbleArray[] skyNibbles;
-    @Unique
-    private boolean wasLoadedFromDisk;
 
     @Inject(method = "<init>(Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/world/chunk/UpgradeData;[Lnet/minecraft/world/chunk/ChunkSection;Lnet/minecraft/world/ChunkTickScheduler;Lnet/minecraft/world/ChunkTickScheduler;)V", at = @At("TAIL"))
     public void onConstruct(ChunkPos pos, UpgradeData upgradeData, @Nullable ChunkSection[] sections, ChunkTickScheduler<Block> blockTickScheduler, ChunkTickScheduler<Fluid> fluidTickScheduler, CallbackInfo ci) {
         this.blockNibbles = StarLightEngine.getFilledEmptyLight(false);
         this.skyNibbles = StarLightEngine.getFilledEmptyLight(true);
-        this.wasLoadedFromDisk = false;
     }
 
     @Override
@@ -53,15 +50,5 @@ public abstract class ProtoChunkMixin implements NibbledChunk, Chunk {
     @Override
     public void setSkyNibbles(SWMRNibbleArray[] nibbles) {
         this.skyNibbles = nibbles;
-    }
-
-    @Override
-    public boolean wasLoadedFromDisk() {
-        return this.wasLoadedFromDisk;
-    }
-
-    @Override
-    public void setWasLoadedFromDisk(boolean value) {
-        this.wasLoadedFromDisk = value;
     }
 }

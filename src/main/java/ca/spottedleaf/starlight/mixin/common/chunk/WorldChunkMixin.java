@@ -30,8 +30,6 @@ public abstract class WorldChunkMixin implements NibbledChunk, Chunk {
     private volatile SWMRNibbleArray[] blockNibbles;
     @Unique
     private volatile SWMRNibbleArray[] skyNibbles;
-    @Unique
-    private boolean wasLoadedFromDisk;
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {
@@ -53,16 +51,6 @@ public abstract class WorldChunkMixin implements NibbledChunk, Chunk {
         this.skyNibbles = nibbles;
     }
 
-    @Override
-    public boolean wasLoadedFromDisk() {
-        return this.wasLoadedFromDisk;
-    }
-
-    @Override
-    public void setWasLoadedFromDisk(boolean value) {
-        this.wasLoadedFromDisk = value;
-    }
-
     @Inject(method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ProtoChunk;)V", at = @At("TAIL"))
     public void onTransitionToFull(World world, ProtoChunk protoChunk, CallbackInfo ci) {
         this.setBlockNibbles(((NibbledChunk)protoChunk).getBlockNibbles());
@@ -74,6 +62,5 @@ public abstract class WorldChunkMixin implements NibbledChunk, Chunk {
     public void onConstruct(World world, ChunkPos pos, BiomeArray biomes, UpgradeData upgradeData, TickScheduler<Block> blockTickScheduler, TickScheduler<Fluid> fluidTickScheduler, long inhabitedTime, @Nullable ChunkSection[] sections, @Nullable Consumer<WorldChunk> loadToWorldConsumer, CallbackInfo ci) {
         this.skyNibbles = StarLightEngine.getFilledEmptyLight(true);
         this.blockNibbles = StarLightEngine.getFilledEmptyLight(false);
-        this.wasLoadedFromDisk = false;
     }
 }

@@ -33,14 +33,4 @@ public abstract class ReadOnlyChunkMixin implements NibbledChunk, Chunk {
     public void setSkyNibbles(SWMRNibbleArray[] nibbles) {
         ((NibbledChunk)this.wrapped).setSkyNibbles(nibbles);
     }
-
-    @Override
-    public boolean wasLoadedFromDisk() {
-        return ((NibbledChunk)this.wrapped).wasLoadedFromDisk();
-    }
-
-    @Override
-    public void setWasLoadedFromDisk(boolean value) {
-        ((NibbledChunk)this.wrapped).setWasLoadedFromDisk(value);
-    }
 }

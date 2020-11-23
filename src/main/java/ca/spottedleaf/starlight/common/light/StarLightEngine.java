@@ -552,18 +552,8 @@ public abstract class StarLightEngine {
         this.setBlocksForChunkInCache(chunkX, chunkZ, chunk.getSectionArray());
         this.setNibblesForChunkInCache(chunkX, chunkZ, this.getNibblesOnChunk(chunk));
 
-        // do we need to check edges?
-        boolean checkEdges = false;
-
-        for (final Chunk chunkInCache : this.chunkCache) {
-            if (chunkInCache != null && ((NibbledChunk)chunkInCache).wasLoadedFromDisk()) {
-                checkEdges = true;
-                break;
-            }
-        }
-
         try {
-            this.lightChunk(lightAccess, chunk, checkEdges);
+            this.lightChunk(lightAccess, chunk, false);
             this.updateVisible(lightAccess);
         } finally {
             this.destroyCaches();

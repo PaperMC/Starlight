@@ -9,8 +9,4 @@ public interface NibbledChunk {
 
     public SWMRNibbleArray[] getSkyNibbles();
     public void setSkyNibbles(SWMRNibbleArray[] nibbles);
-
-    public boolean wasLoadedFromDisk();
-
-    public void setWasLoadedFromDisk(boolean value);
 }

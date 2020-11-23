@@ -196,13 +196,15 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
     @Overwrite
     public CompletableFuture<Chunk> light(Chunk chunk, boolean lit) {
         ChunkPos chunkPos = chunk.getPos();
+
+        if (lit) {
+            ((ThreadedAnvilChunkStorageMethods)this.chunkStorage).releaseLightTicketPublic(chunkPos);
+            return CompletableFuture.completedFuture(chunk);
+        }
+
         return CompletableFuture.supplyAsync(() -> {
-            if (lit) {
-                this.getLightEngine().checkChunkEdges(chunkPos.x, chunkPos.z);
-            } else {
-                this.getLightEngine().lightChunk(chunkPos.x, chunkPos.z);
-                chunk.setLightOn(true);
-            }
+            this.getLightEngine().lightChunk(chunkPos.x, chunkPos.z);
+            chunk.setLightOn(true);
 
             ((ThreadedAnvilChunkStorageMethods)this.chunkStorage).releaseLightTicketPublic(chunkPos);
             return chunk;

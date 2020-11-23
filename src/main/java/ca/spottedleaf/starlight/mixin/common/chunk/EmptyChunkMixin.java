@@ -25,12 +25,4 @@ public abstract class EmptyChunkMixin implements NibbledChunk, Chunk {
 
     @Override
     public void setSkyNibbles(SWMRNibbleArray[] nibbles) {}
-
-    @Override
-    public boolean wasLoadedFromDisk() {
-        return false;
-    }
-
-    @Override
-    public void setWasLoadedFromDisk(boolean value) {}
 }
