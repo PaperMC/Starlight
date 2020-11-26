@@ -1,6 +1,11 @@
-Starlight (beta)
+Starlight (BETA)
 ==
 Fabric mod for completely rewriting the vanilla light engine.
+
+## Known Issues (This is why we're in BETA)
+Check out [The issues tab](https://github.com/Spottedleaf/Starlight/issues)
+Please note that since this is a beta, there could be some (severe) light corrupting issues. Do not use if you do not 
+want to take that risk!
 
 ## Results
 ![Starlight crushing all](https://i.imgur.com/6OcuyJX.png)
@@ -46,12 +51,3 @@ Paper's changes also don't even target obvious issues with the light engine...
 Effectively, it's really hard to fix the performance of the light engine by
 editing it - it's such a catastrophe it's better off burning it to the ground
 and starting anew.
-
-## Known Issues (This is why we're in BETA)
-- The Starlight fabric mod, unlike the [Tuinity](https://github.com/Spottedleaf/Tuinity/tree/dev/lighting) 
-implementation does not have general improvements around the chunk system and shape math that Tuinity/Paper has, which need
-to be ported. This means the fabric mod might not live up to the performance of the generation results,
-as those were obtained on the Tuinity Starlight implementation. Notably, lighting snowy areas is
-notably worse on the fabric mod compared to the Tuinity implementation.
-
-- There are lighting issues on the client that have yet to be resolved
