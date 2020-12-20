@@ -7,6 +7,20 @@ import java.util.Arrays;
 // SWMR -> Single Writer Multi Reader Nibble Array
 public final class SWMRNibbleArray {
 
+    /*
+     * Null nibble - nibble does not exist, and should not be written to. Just like vanilla - null
+     * nibbles are always 0 - and they are never written to directly. Only initialised/uninitialised
+     * nibbles can be written to.
+     *
+     * Uninitialised nibble - They are all 0, but the backing array isn't initialised.
+     *
+     * Initialised nibble - Has light data.
+     */
+
+    protected static final int INIT_STATE_NULL   = 0; // null
+    protected static final int INIT_STATE_UNINIT = 1; // uninitialised
+    protected static final int INIT_STATE_INIT   = 2; // initialised
+
     public static final int ARRAY_SIZE = 16 * 16 * 16 / (8/4); // blocks / bytes per block
     protected static final byte[] FULL_LIT = new byte[ARRAY_SIZE];
     static {
@@ -28,132 +42,234 @@ public final class SWMRNibbleArray {
         WORKING_BYTES_POOL.get().addFirst(bytes);
     }
 
-    protected byte[] workingBytes;
-    protected byte[] visibleBytes;
-    protected final int defaultNullValue;
-    private boolean isNullNibble;
+    protected int stateUpdating;
+    protected volatile int stateVisible;
 
-    public SWMRNibbleArray(final boolean isNullNibble, final int defaultNullValue) {
-        this(null, defaultNullValue);
-        this.isNullNibble = isNullNibble;
-    }
+    protected byte[] storageUpdating;
+    protected boolean updatingDirty; // only returns whether storageUpdating is dirty
+    protected byte[] storageVisible;
 
     public SWMRNibbleArray() {
-        this(null, 0); // lazy init
+        this(null, false); // lazy init
     }
 
     public SWMRNibbleArray(final byte[] bytes) {
-        this(bytes, 0);
+        this(bytes, false);
     }
 
-    protected SWMRNibbleArray(final byte[] bytes, final int defaultNullValue) {
+    public SWMRNibbleArray(final byte[] bytes, final boolean isNullNibble) {
         if (bytes != null && bytes.length != ARRAY_SIZE) {
             throw new IllegalArgumentException();
         }
-        this.defaultNullValue = defaultNullValue;
-        this.visibleBytes = bytes != null ? bytes.clone() : null;
+        this.stateVisible = this.stateUpdating = bytes == null ? (isNullNibble ? INIT_STATE_NULL : INIT_STATE_UNINIT) : INIT_STATE_INIT;
+        this.storageUpdating = this.storageVisible = bytes;
     }
 
-    public boolean isDirty() {
-        return this.workingBytes != null;
-    }
+    // operation type: visible
+    public boolean isAllZero() {
+        final byte[] bytes = this.storageVisible;
 
-    public boolean isNullNibbleUpdating() {
-        return this.workingBytes == null && this.isNullNibble;
-    }
-
-    public boolean isNullNibbleVisible() {
-        synchronized (this) {
-            return this.isNullNibble;
+        if (this.storageVisible == null) {
+            return true;
         }
-    }
-
-    public void markNonNull() {
-        synchronized (this) {
-            this.isNullNibble = false;
-        }
-    }
-
-    public boolean isInitialisedUpdating() {
-        return this.workingBytes != null || this.visibleBytes != null;
-    }
-
-    public boolean isInitialisedVisible() {
-        synchronized (this) {
-            return this.visibleBytes != null;
-        }
-    }
-
-    public void initialiseWorking() {
-        if (this.workingBytes != null) {
-            return;
-        }
-        final byte[] working = allocateBytes();
-        this.copyIntoImpl(working, 0);
-        this.workingBytes = working;
-    }
-
-    public void copyFrom(final byte[] src, final int off) {
-        if (this.workingBytes == null) {
-            this.workingBytes = allocateBytes();
-        }
-        System.arraycopy(src, off, this.workingBytes, 0, ARRAY_SIZE);
-    }
-
-    public boolean updateVisible() {
-        if (this.workingBytes == null) {
-            return false;
-
-        }
-        final byte[] oldVisible = this.visibleBytes;
 
         synchronized (this) {
-            this.isNullNibble = false;
+            for (int i = 0; i < (ARRAY_SIZE >>> 4); ++i) {
+                byte whole = bytes[i << 4];
 
-            this.visibleBytes = this.workingBytes;
-            this.workingBytes = null;
-        }
+                for (int k = 1; k < (1 << 4); ++k) {
+                    whole |= bytes[(i << 4) | k];
+                }
 
-        if (oldVisible != null) {
-            freeBytes(oldVisible);
+                if (whole != 0) {
+                    return false;
+                }
+            }
         }
 
         return true;
     }
 
-    public void copyInto(final byte[] bytes, final int off) {
-        synchronized (this) {
-            this.copyIntoImpl(bytes, off);
+    // operation type: updating on src, updating on other
+    public void extrudeLower(final SWMRNibbleArray other) {
+        if (other.stateUpdating == INIT_STATE_NULL) {
+            throw new IllegalArgumentException();
+        }
+
+        if (other.storageUpdating == null) {
+            this.setUninitialised();
+            return;
+        }
+
+        final byte[] src = other.storageUpdating;
+        final byte[] into;
+
+        if (this.storageUpdating != null) {
+            into = this.storageUpdating;
+        } else {
+            this.storageUpdating = into = allocateBytes();
+            this.stateUpdating = INIT_STATE_INIT;
+        }
+        this.updatingDirty = true;
+
+        final int start = 0;
+        final int end = (15 | (15 << 4)) >>> 1;
+
+        /* x | (z << 4) | (y << 8) */
+        for (int y = 0; y <= 15; ++y) {
+            System.arraycopy(src, start, into, y << (8 - 1), end - start + 1);
         }
     }
 
-    protected void copyIntoImpl(final byte[] bytes, final int off) {
-        if (this.visibleBytes != null) {
-            System.arraycopy(this.visibleBytes, 0, bytes, off, ARRAY_SIZE);
+    // operation type: updating
+    public void setFull() {
+        this.stateUpdating = INIT_STATE_INIT;
+        Arrays.fill(this.storageUpdating == null || !this.updatingDirty ? this.storageUpdating = allocateBytes() : this.storageUpdating, (byte)-1);
+        this.updatingDirty = true;
+    }
+
+    // operation type: updating
+    public void setZero() {
+        this.stateUpdating = INIT_STATE_INIT;
+        Arrays.fill(this.storageUpdating == null || !this.updatingDirty ? this.storageUpdating = allocateBytes() : this.storageUpdating, (byte)0);
+        this.updatingDirty = true;
+    }
+
+    // operation type: updating
+    public void setNonNull() {
+        if (this.stateUpdating != INIT_STATE_NULL) {
+            return;
+        }
+        this.stateUpdating = INIT_STATE_UNINIT;
+    }
+
+    // operation type: updating
+    public void setNull() {
+        this.stateUpdating = INIT_STATE_NULL;
+        if (this.updatingDirty && this.storageUpdating != null) {
+            freeBytes(this.storageUpdating);
+        }
+        this.storageUpdating = null;
+        this.updatingDirty = false;
+    }
+
+    // operation type: updating
+    public void setUninitialised() {
+        this.stateUpdating = INIT_STATE_UNINIT;
+        if (this.storageUpdating != null && this.updatingDirty) {
+            freeBytes(this.storageUpdating);
+        }
+        this.storageUpdating = null;
+        this.updatingDirty = false;
+    }
+
+    // operation type: updating
+    public boolean isDirty() {
+        return this.stateUpdating != this.stateVisible || this.updatingDirty;
+    }
+
+    // operation type: updating
+    public boolean isNullNibbleUpdating() {
+        return this.stateUpdating == INIT_STATE_NULL;
+    }
+
+    // operation type: visible
+    public boolean isNullNibbleVisible() {
+        return this.stateVisible == INIT_STATE_NULL;
+    }
+
+    // opeartion type: updating
+    public boolean isUninitialisedUpdating() {
+        return this.stateUpdating == INIT_STATE_UNINIT;
+    }
+
+    // operation type: visible
+    public boolean isUninitialisedVisible() {
+        return this.stateVisible == INIT_STATE_UNINIT;
+    }
+
+    // operation type: updating
+    public boolean isInitialisedUpdating() {
+        return this.stateUpdating == INIT_STATE_INIT;
+    }
+
+    // operation type: visible
+    public boolean isInitialisedVisible() {
+        return this.stateVisible == INIT_STATE_INIT;
+    }
+
+    // operation type: updating
+    protected void swapUpdatingAndMarkDirty() {
+        if (this.updatingDirty) {
+            return;
+        }
+
+        if (this.storageUpdating == null) {
+            this.storageUpdating = allocateBytes();
+            Arrays.fill(this.storageUpdating, (byte)0);
         } else {
-            if (this.isNullNibble && this.defaultNullValue != 0) {
-                Arrays.fill(bytes, off, off + ARRAY_SIZE, (byte)(this.defaultNullValue | (this.defaultNullValue << 4)));
+            System.arraycopy(this.storageUpdating, 0, this.storageUpdating = allocateBytes(), 0, ARRAY_SIZE);
+        }
+
+        this.stateUpdating = INIT_STATE_INIT;
+        this.updatingDirty = true;
+    }
+
+    // operation type: updating
+    public boolean updateVisible() {
+        if (!this.isDirty()) {
+            return false;
+        }
+
+        synchronized (this) {
+            if (this.stateUpdating == INIT_STATE_NULL || this.stateUpdating == INIT_STATE_UNINIT) {
+                this.storageVisible = null;
             } else {
-                Arrays.fill(bytes, off, off + ARRAY_SIZE, (byte)0);
+                if (this.storageVisible == null) {
+                    this.storageVisible = this.storageUpdating.clone();
+                } else {
+                    System.arraycopy(this.storageUpdating, 0, this.storageVisible, 0, ARRAY_SIZE);
+                }
+
+                freeBytes(this.storageUpdating);
+                this.storageUpdating = this.storageVisible;
+            }
+            this.updatingDirty = false;
+            this.stateVisible = this.stateUpdating;
+        }
+
+        return true;
+    }
+
+    // operation type: visible
+    public ChunkNibbleArray toVanillaNibble() {
+        synchronized (this) {
+            switch (this.stateVisible) {
+                case INIT_STATE_NULL:
+                    return null;
+                case INIT_STATE_UNINIT:
+                    return new ChunkNibbleArray();
+                case INIT_STATE_INIT:
+                    return new ChunkNibbleArray(this.storageVisible.clone());
+                default:
+                    throw new IllegalStateException();
             }
         }
     }
 
-    public ChunkNibbleArray asNibble() {
-        synchronized (this) {
-            return this.visibleBytes == null ? (this.isNullNibble ? null : new ChunkNibbleArray()) : new ChunkNibbleArray(this.visibleBytes.clone());
-        }
-    }
+    /* x | (z << 4) | (y << 8) */
 
+    // operation type: updating
     public int getUpdating(final int x, final int y, final int z) {
         return this.getUpdating((x & 15) | ((z & 15) << 4) | ((y & 15) << 8));
     }
 
+    // operation type: updating
     public int getUpdating(final int index) {
         // indices range from 0 -> 4096
-        byte[] bytes = this.workingBytes == null ? this.visibleBytes : this.workingBytes;
+        final byte[] bytes = this.storageUpdating;
         if (bytes == null) {
-            return this.isNullNibble ? this.defaultNullValue : 0;
+            return 0;
         }
         final byte value = bytes[index >>> 1];
 
@@ -162,17 +278,20 @@ public final class SWMRNibbleArray {
         return ((value >>> ((index & 1) << 2)) & 0xF);
     }
 
+    // operation type: visible
     public int getVisible(final int x, final int y, final int z) {
         return this.getVisible((x & 15) | ((z & 15) << 4) | ((y & 15) << 8));
     }
 
+    // operation type: visible
     public int getVisible(final int index) {
         synchronized (this) {
             // indices range from 0 -> 4096
-            if (this.visibleBytes == null) {
-                return this.isNullNibble ? this.defaultNullValue : 0;
+            final byte[] visibleBytes = this.storageVisible;
+            if (visibleBytes == null) {
+                return 0;
             }
-            final byte value = this.visibleBytes[index >>> 1];
+            final byte value = visibleBytes[index >>> 1];
 
             // if we are an even index, we want lower 4 bits
             // if we are an odd index, we want upper 4 bits
@@ -180,17 +299,19 @@ public final class SWMRNibbleArray {
         }
     }
 
+    // operation type: updating
     public void set(final int x, final int y, final int z, final int value) {
         this.set((x & 15) | ((z & 15) << 4) | ((y & 15) << 8), value);
     }
 
+    // operation type: updating
     public void set(final int index, final int value) {
-        if (this.workingBytes == null) {
-            this.initialiseWorking();
+        if (!this.updatingDirty) {
+            this.swapUpdatingAndMarkDirty();
         }
         final int shift = (index & 1) << 2;
         final int i = index >>> 1;
 
-        this.workingBytes[i] = (byte)((this.workingBytes[i] & (0xF0 >>> shift)) | (value << shift));
+        this.storageUpdating[i] = (byte)((this.storageUpdating[i] & (0xF0 >>> shift)) | (value << shift));
     }
 }

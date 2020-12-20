@@ -1,11 +1,9 @@
-package ca.spottedleaf.starlight.mixin.common.lightengine;
+package ca.spottedleaf.starlight.mixin.lightengine;
 
-import ca.spottedleaf.starlight.common.chunk.ThreadedAnvilChunkStorageMethods;
+import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.light.StarLightInterface;
 import ca.spottedleaf.starlight.common.light.StarLightLightingProvider;
-import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import net.minecraft.server.world.ChunkTaskPrioritySystem;
-import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerLightingProvider;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.world.ThreadedAnvilChunkStorage;
@@ -21,7 +19,6 @@ import net.minecraft.world.chunk.ChunkProvider;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.light.LightingProvider;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -61,15 +58,19 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
     @Unique
     protected final ConcurrentLinkedQueue<Runnable> postTasks = new ConcurrentLinkedQueue<>();
 
-    private void enqueue(int x, int z, Runnable task) {
+    @Unique
+    private void enqueue(final int x, final int z, final Runnable task) {
         this.enqueue(x, z, task, false);
     }
 
-    private void enqueue(int x, int z, Runnable task, boolean postTask) {
-        this.enqueue(x, z, ((ThreadedAnvilChunkStorageMethods)this.chunkStorage).getCompletedLevelSupplierPublic(ChunkPos.toLong(x, z)), postTask, task);
+    @Unique
+    private void enqueue(final int x, final int z, final Runnable task, final boolean postTask) {
+        this.enqueue(x, z, this.chunkStorage.getCompletedLevelSupplier(ChunkPos.toLong(x, z)), postTask, task);
     }
 
-    private void enqueue(int x, int z, IntSupplier completedLevelSupplier, boolean postTask, Runnable task) {
+    @Unique
+    private void enqueue(final int x, final int z, final IntSupplier completedLevelSupplier, final boolean postTask,
+                         final Runnable task) {
         this.executor.send(ChunkTaskPrioritySystem.createMessage(() -> {
             if (postTask) {
                 this.postTasks.add(task);
@@ -79,21 +80,15 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
         }, ChunkPos.toLong(x, z), completedLevelSupplier));
     }
 
-    public ServerLightingProviderMixin(ChunkProvider chunkProvider, boolean hasBlockLight, boolean hasSkyLight) {
+    public ServerLightingProviderMixin(final ChunkProvider chunkProvider, final boolean hasBlockLight, final boolean hasSkyLight) {
         super(chunkProvider, hasBlockLight, hasSkyLight);
     }
 
     private long workTicketCounts = 0L;
 
-    /**
-     * @author Spottedleaf
-     */
-    @Overwrite
-    public void checkBlock(BlockPos pos) {
-        BlockPos immutable = pos.toImmutable();
+    @Unique
+    private void queueTaskForSection(final int chunkX, final int chunkY, final int chunkZ, final Runnable runnable) {
         // TODO this impl is actually fucking awful for checking neighbours and keeping neighbours, for the love of god rewrite it
-        int chunkX = pos.getX() >> 4;
-        int chunkZ = pos.getZ() >> 4;
 
         final ServerWorld world = (ServerWorld)this.getLightEngine().getWorld();
 
@@ -111,11 +106,13 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
                 world.getChunk(dx + chunkX, dz + chunkZ, (dx | dz) == 0 ? ChunkStatus.LIGHT : ChunkStatus.FEATURES, true);
             }
         }
+
         world.getChunkManager().addTicket(StarLightInterface.CHUNK_WORK_TICKET, new ChunkPos(chunkX, chunkZ), 0, ticketId);
+
         this.enqueue(chunkX, chunkZ, () -> {
-            super.checkBlock(immutable);
+            runnable.run();
             this.enqueue(chunkX, chunkZ, () -> {
-                ((ThreadedAnvilChunkStorageMethods)world.getChunkManager().threadedAnvilChunkStorage).scheduleOntoMain(() -> {
+                world.getChunkManager().threadedAnvilChunkStorage.mainThreadExecutor.execute(() -> {
                     world.getChunkManager().removeTicket(StarLightInterface.CHUNK_WORK_TICKET, new ChunkPos(chunkX, chunkZ), 0, ticketId);
                 });
             }, true);
@@ -126,7 +123,18 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
      * @author Spottedleaf
      */
     @Overwrite
-    public void updateChunkStatus(ChunkPos pos) {
+    public void checkBlock(final BlockPos pos) {
+        final BlockPos posCopy = pos.toImmutable();
+        this.queueTaskForSection(posCopy.getX() >> 4, posCopy.getY() >> 4, posCopy.getZ() >> 4, () -> {
+            super.checkBlock(posCopy);
+        });
+    }
+
+    /**
+     * @author Spottedleaf
+     */
+    @Overwrite
+    public void updateChunkStatus(final ChunkPos pos) {
         // Do nothing, we don't care
     }
 
@@ -134,7 +142,17 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
      * @author Spottedleaf
      */
     @Overwrite
-    public void setSectionStatus(ChunkSectionPos pos, boolean notReady) {
+    public void setSectionStatus(final ChunkSectionPos pos, final boolean notReady) {
+        this.queueTaskForSection(pos.getX(), pos.getY(), pos.getZ(), () -> {
+            super.setSectionStatus(pos, notReady);
+        });
+    }
+
+    /**
+     * @author Spottedleaf
+     */
+    @Overwrite
+    public void setColumnEnabled(final ChunkPos pos, final boolean lightEnabled) {
         // light impl does not need to do this
     }
 
@@ -142,15 +160,8 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
      * @author Spottedleaf
      */
     @Overwrite
-    public void setColumnEnabled(ChunkPos pos, boolean lightEnabled) {
-        // light impl does not need to do this
-    }
-
-    /**
-     * @author Spottedleaf
-     */
-    @Overwrite
-    public void enqueueSectionData(LightType lightType, ChunkSectionPos pos, @Nullable ChunkNibbleArray nibbles, boolean bl) {
+    public void enqueueSectionData(final LightType lightType, final ChunkSectionPos pos, final ChunkNibbleArray nibbles,
+                                   final boolean bl) {
         // hook for loading light data is changed, as chunk is no longer loaded at this stage
     }
 
@@ -158,7 +169,7 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
      * @author Spottedleaf
      */
     @Overwrite
-    public void setRetainData(ChunkPos pos, boolean retainData) {
+    public void setRetainData(final ChunkPos pos, final boolean retainData) {
         // light impl does not need to do this
     }
 
@@ -194,23 +205,23 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
      * @author Spottedleaf
      */
     @Overwrite
-    public CompletableFuture<Chunk> light(Chunk chunk, boolean lit) {
-        ChunkPos chunkPos = chunk.getPos();
-
-        if (lit) {
-            ((ThreadedAnvilChunkStorageMethods)this.chunkStorage).releaseLightTicketPublic(chunkPos);
-            return CompletableFuture.completedFuture(chunk);
-        }
+    public CompletableFuture<Chunk> light(final Chunk chunk, final boolean lit) {
+        final ChunkPos chunkPos = chunk.getPos();
 
         return CompletableFuture.supplyAsync(() -> {
-            this.getLightEngine().lightChunk(chunkPos.x, chunkPos.z);
-            chunk.setLightOn(true);
+            final Boolean[] emptySections = StarLightEngine.getEmptySectionsForChunk(chunk);
+            if (!lit) {
+                this.getLightEngine().lightChunk(chunkPos.x, chunkPos.z, emptySections);
+                chunk.setLightOn(true);
+            } else {
+                this.getLightEngine().loadInChunk(chunkPos.x, chunkPos.z, emptySections);
+            }
 
-            ((ThreadedAnvilChunkStorageMethods)this.chunkStorage).releaseLightTicketPublic(chunkPos);
+            this.chunkStorage.releaseLightTicket(chunkPos);
             return chunk;
         }, (runnable) -> {
             this.enqueue(chunkPos.x, chunkPos.z, runnable);
-        }).whenComplete((Chunk c, Throwable throwable) -> {
+        }).whenComplete((final Chunk c, final Throwable throwable) -> {
             if (throwable != null) {
                 LOGGER.fatal("Failed to light chunk " + chunkPos, throwable);
             }

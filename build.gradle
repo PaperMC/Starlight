@@ -44,6 +44,10 @@ tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
 }
 
+minecraft {
+    accessWidener "src/main/resources/starlight.accesswidener"
+}
+
 // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
 // if it is present.
 // If you remove this task, sources will not be generated.

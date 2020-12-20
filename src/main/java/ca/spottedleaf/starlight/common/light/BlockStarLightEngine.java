@@ -1,13 +1,14 @@
 package ca.spottedleaf.starlight.common.light;
 
-import ca.spottedleaf.starlight.common.blockstate.LightAccessBlockState;
-import ca.spottedleaf.starlight.common.chunk.NibbledChunk;
+import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
+import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import net.minecraft.block.BlockState;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkProvider;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.world.chunk.PalettedContainer;
 import net.minecraft.world.chunk.ReadOnlyChunk;
 import net.minecraft.world.chunk.WorldChunk;
 import java.util.ArrayList;
@@ -23,18 +24,22 @@ public final class BlockStarLightEngine extends StarLightEngine {
 
     @Override
     protected SWMRNibbleArray[] getNibblesOnChunk(final Chunk chunk) {
-        return ((NibbledChunk)chunk).getBlockNibbles();
+        return ((ExtendedChunk)chunk).getBlockNibbles();
     }
 
     @Override
     protected void setNibbles(final Chunk chunk, final SWMRNibbleArray[] to) {
-        ((NibbledChunk)chunk).setBlockNibbles(to);
+        ((ExtendedChunk)chunk).setBlockNibbles(to);
     }
 
     @Override
     protected boolean canUseChunk(final Chunk chunk) {
         return chunk.getStatus().isAtLeast(ChunkStatus.LIGHT) && (this.isClientSide || chunk.isLightOn());
     }
+
+    @Override
+    protected void handleEmptySectionChanges(final ChunkProvider lightAccess, final Chunk chunk,
+                                             final Boolean[] emptinessChanges, final boolean unlit) {}
 
     @Override
     protected final void checkBlock(final int worldX, final int worldY, final int worldZ) {
@@ -52,27 +57,28 @@ public final class BlockStarLightEngine extends StarLightEngine {
         this.setLightLevel(worldX, worldY, worldZ, emittedLevel);
         // this accounts for change in emitted light that would cause an increase
         if (emittedLevel != 0) {
-            this.increaseQueue[this.increaseQueueInitialLength++] = (worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) |
-                    emittedLevel << (6 + 6 + 9) |
-                    ((AxisDirection.POSITIVE_X.ordinal() | 8) << (6 + 6 + 9 + 4)) |
-                    (((LightAccessBlockState)blockState).isConditionallyFullOpaque() ? FLAG_HAS_SIDED_TRANSPARENT_BLOCKS : 0);
+            this.increaseQueue[this.increaseQueueInitialLength++] =
+                    ((worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
+                            | (emittedLevel & 0xFL) << (6 + 6 + 16)
+                            | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4))
+                            | (((ExtendedAbstractBlockState)blockState).isConditionallyFullOpaque() ? FLAG_HAS_SIDED_TRANSPARENT_BLOCKS : 0);
         }
         // this also accounts for a change in emitted light that would cause a decrease
         // this also accounts for the change of direction of propagation (i.e old block was full transparent, new block is full opaque or vice versa)
         // as it checks all neighbours (even if current level is 0)
-        this.decreaseQueue[this.decreaseQueueInitialLength++] = (worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) |
-                currentLevel << (6 + 6 + 9) |
-                ((AxisDirection.POSITIVE_X.ordinal() | 8) << (6 + 6 + 9 + 4));
-                // always keep sided transparent false here, new block might be conditionally transparent which would
-                // prevent us from decreasing sources in the directions where the new block is opaque
-                // if it turns out we were wrong to de-propagate the source, the re-propagate logic WILL always
-                // catch that and fix it.
+        this.decreaseQueue[this.decreaseQueueInitialLength++] =
+                ((worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
+                        | (currentLevel & 0xFL) << (6 + 6 + 16)
+                        | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4));
+                        // always keep sided transparent false here, new block might be conditionally transparent which would
+                        // prevent us from decreasing sources in the directions where the new block is opaque
+                        // if it turns out we were wrong to de-propagate the source, the re-propagate logic WILL always
+                        // catch that and fix it.
         // re-propagating neighbours (done by the decrease queue) will also account for opacity changes in this block
     }
 
     @Override
-    protected void propagateBlockChanges(final ChunkProvider lightAccess, final Chunk atChunk,
-                                         final Set<BlockPos> positions) {
+    protected void propagateBlockChanges(final ChunkProvider lightAccess, final Chunk atChunk, final Set<BlockPos> positions) {
         for (final BlockPos pos : positions) {
             this.checkBlock(pos.getX(), pos.getY(), pos.getZ());
         }
@@ -95,20 +101,17 @@ public final class BlockStarLightEngine extends StarLightEngine {
                     // no sources in empty sections
                     continue;
                 }
-                final ChunkSection section = sections[sectionY];
+                final PalettedContainer<BlockState> section = sections[sectionY].container;
+                final int offY = sectionY << 4;
 
-                for (int localY = 0; localY <= 15; ++localY) {
-                    final int realY = localY | (sectionY << 4);
-                    for (int localZ = 0; localZ <= 15; ++localZ) {
-                        for (int localX = 0; localX <= 15; ++localX) {
-                            final BlockState blockState = section.getBlockState(localX, localY, localZ);
-                            if (blockState.getLuminance() <= 0) {
-                                continue;
-                            }
-
-                            sources.add(new BlockPos(offX + localX, realY, offZ + localZ));
-                        }
+                for (int index = 0; index < (16 * 16 * 16); ++index) {
+                    final BlockState state = section.get(index);
+                    if (state.getLuminance() <= 0) {
+                        continue;
                     }
+
+                    // index = x | (z << 4) | (y << 8)
+                    sources.add(new BlockPos(offX | (index & 15), offY | (index >>> 8), offZ | ((index >>> 4) & 15)));
                 }
             }
 
@@ -132,10 +135,11 @@ public final class BlockStarLightEngine extends StarLightEngine {
                 continue;
             }
 
-            this.increaseQueue[this.increaseQueueInitialLength++] = (pos.getX() + (pos.getZ() << 6) + (pos.getY() << (6 + 6)) + this.coordinateOffset) |
-                    (emittedLight) << (6 + 6 + 9) |
-                    ((AxisDirection.POSITIVE_X.ordinal() | 8) << (6 + 6 + 9 + 4)) |
-                    (((LightAccessBlockState)blockState).isConditionallyFullOpaque() ? FLAG_HAS_SIDED_TRANSPARENT_BLOCKS : 0);
+            this.increaseQueue[this.increaseQueueInitialLength++] =
+                    ((pos.getX() + (pos.getZ() << 6) + (pos.getY() << (6 + 6)) + this.coordinateOffset) & ((1L << (6 + 6 + 16)) - 1))
+                            | (emittedLight & 0xFL) << (6 + 6 + 16)
+                            | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4))
+                            | (((ExtendedAbstractBlockState)blockState).isConditionallyFullOpaque() ? FLAG_HAS_SIDED_TRANSPARENT_BLOCKS : 0);
 
 
             // propagation wont set this for us
@@ -147,7 +151,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
             this.performLightIncrease(lightAccess);
 
             // verify neighbour edges
-            this.checkChunkEdges(lightAccess, chunk);
+            this.checkChunkEdges(lightAccess, chunk, -1, 16);
         } else {
             this.propagateNeighbourLevels(lightAccess, chunk, -1, 16);
 

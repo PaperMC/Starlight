@@ -1,6 +1,6 @@
 package ca.spottedleaf.starlight.common.blockstate;
 
-public interface LightAccessBlockState {
+public interface ExtendedAbstractBlockState {
 
     public boolean isConditionallyFullOpaque();
 
