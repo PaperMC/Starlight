@@ -21,12 +21,11 @@ while Vanilla's light engine took ~220s seconds. Phosphor took ~170s. Compared t
 mod available (Phosphor), Starlight is about 25 times faster at generating light for chunks - and 
 about 35 times faster than the vanilla light engine.
 
-Starlight will relight vanilla lit chunks due to a difference in how sky light is managed, however
-the **new lighting data is completely compatible with the vanilla light engine, meaning you can load a world in 
-vanilla that's been lit by Starlight without issue**. This means for loading vanilla worlds,
-the light engine impact will be exactly the same for generating new light for chunks, but as documented that's rather
-minimal. Once the chunks are relight, no additional processing is performed which means there is no light engine impact
-when loading chunks.
+Starlight will relight vanilla lit chunks due to a difference in how sky light is managed, and the
+new skylight data is incompatible with the vanilla skylight format. However, when vanilla loads
+the chunks, **it will simply relight the chunks, so the save format is compatible with vanilla.** 
+If you are going to compare starlight to vanilla or vice versa, you should be aware of the 
+above - relighting chunks is always more expensive than loading them.
 
 ## Purpose
 The performance of the vanilla engine is just awful. Existing
