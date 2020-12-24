@@ -1,7 +1,6 @@
 Starlight (BETA)
 ==
 Fabric mod for completely rewriting the vanilla light engine.
-Now supports 1.16.1 - 1.16.3 and has a working Github CI in Actions tab.
 
 ## Known Issues (This is why we're in BETA)
 Check out [The issues tab](https://github.com/Spottedleaf/Starlight/issues)
