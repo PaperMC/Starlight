@@ -1,4 +1,4 @@
-package ca.spottedleaf.starlight.mixin.chunk;
+package ca.spottedleaf.starlight.mixin.common.chunk;
 
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;

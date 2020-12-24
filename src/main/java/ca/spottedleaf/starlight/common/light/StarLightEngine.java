@@ -2,6 +2,8 @@ package ca.spottedleaf.starlight.common.light;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import ca.spottedleaf.starlight.common.util.IntegerUtil;
+import it.unimi.dsi.fastutil.shorts.ShortCollection;
+import it.unimi.dsi.fastutil.shorts.ShortIterator;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.util.math.BlockPos;
@@ -394,108 +396,124 @@ public abstract class StarLightEngine {
 
     protected abstract void checkBlock(final int worldX, final int worldY, final int worldZ);
 
+    protected void checkChunkEdge(final ChunkProvider lightAccess, final Chunk chunk,
+                                  final int chunkX, final int chunkY, final int chunkZ) {
+        final SWMRNibbleArray currNibble = this.getNibbleFromCache(chunkX, chunkY, chunkZ);
+        if (currNibble == null) {
+            return;
+        }
+
+        for (final AxisDirection direction : ONLY_HORIZONTAL_DIRECTIONS) {
+            final int neighbourOffX = direction.x;
+            final int neighbourOffZ = direction.z;
+
+            final SWMRNibbleArray neighbourNibble = this.getNibbleFromCache(chunkX + neighbourOffX,
+                    chunkY, chunkZ + neighbourOffZ);
+
+            if (neighbourNibble == null || neighbourNibble.isNullNibbleUpdating()) {
+                continue;
+            }
+
+            if (!currNibble.isInitialisedUpdating() && !neighbourNibble.isInitialisedUpdating()) {
+                // both are zero, nothing to check.
+                continue;
+            }
+
+            final int incX;
+            final int incZ;
+            final int startX;
+            final int startZ;
+
+            if (neighbourOffX != 0) {
+                // x direction
+                incX = 0;
+                incZ = 1;
+
+                if (direction.x < 0) {
+                    // negative
+                    startX = chunkX << 4;
+                } else {
+                    startX = chunkX << 4 | 15;
+                }
+                startZ = chunkZ << 4;
+            } else {
+                // z direction
+                incX = 1;
+                incZ = 0;
+
+                if (neighbourOffZ < 0) {
+                    // negative
+                    startZ = chunkZ << 4;
+                } else {
+                    startZ = chunkZ << 4 | 15;
+                }
+                startX = chunkX << 4;
+            }
+
+            for (int currY = chunkY << 4, maxY = currY | 15; currY <= maxY; ++currY) {
+                for (int i = 0, currX = startX, currZ = startZ; i < 16; ++i, currX += incX, currZ += incZ) {
+                    final int neighbourX = currX + neighbourOffX;
+                    final int neighbourZ = currZ + neighbourOffZ;
+
+                    final int currentLevel = currNibble.getUpdating((currX & 15) |
+                            ((currZ & 15)) << 4 |
+                            ((currY & 15) << 8)
+                    );
+                    final int neighbourLevel = neighbourNibble.getUpdating((neighbourX & 15) |
+                            ((neighbourZ & 15)) << 4 |
+                            ((currY & 15) << 8)
+                    );
+
+                    if (currentLevel == neighbourLevel && (currentLevel == 0 || currentLevel == 15)) {
+                        // nothing to check here
+                        continue;
+                    }
+
+                    if (Math.abs(currentLevel - neighbourLevel) == 1) {
+                        final BlockState currentBlock = this.getBlockState(currX, currY, currZ);
+                        final BlockState neighbourBlock = this.getBlockState(neighbourX, currY, neighbourZ);
+
+                        final int currentOpacity = ((ExtendedAbstractBlockState)currentBlock).getOpacityIfCached();
+                        final int neighbourOpacity = ((ExtendedAbstractBlockState)neighbourBlock).getOpacityIfCached();
+                        if (currentOpacity == 0 || currentOpacity == 1 ||
+                                neighbourOpacity == 0 || neighbourOpacity == 1) {
+                            // looks good
+                            continue;
+                        }
+                    }
+
+                    // setup queue, it looks like something could be inconsistent
+                    this.checkBlock(currX, currY, currZ);
+                    this.checkBlock(neighbourX, currY, neighbourZ);
+                }
+            }
+        }
+    }
+
+    protected void checkChunkEdges(final ChunkProvider lightAccess, final Chunk chunk, final ShortCollection sections) {
+        final ChunkPos chunkPos = chunk.getPos();
+        final int chunkX = chunkPos.x;
+        final int chunkZ = chunkPos.z;
+
+        for (final ShortIterator iterator = sections.iterator(); iterator.hasNext();) {
+            this.checkChunkEdge(lightAccess, chunk, chunkX, iterator.nextShort(), chunkZ);
+        }
+
+        this.performLightDecrease(lightAccess);
+    }
+
     // subclasses should not initialise caches, as this will always be done by the super call
     // subclasses should not invoke updateVisible, as this will always be done by the super call
     // verifies that light levels on this chunks edges are consistent with this chunk's neighbours
     // edges. if they are not, they are decreased (effectively performing the logic in checkBlock).
     // This does not resolve skylight source problems.
-    protected final void checkChunkEdges(final ChunkProvider lightAccess, final Chunk chunk, final int fromSection, final int toSection) {
+    protected void checkChunkEdges(final ChunkProvider lightAccess, final Chunk chunk, final int fromSection, final int toSection) {
         final ChunkPos chunkPos = chunk.getPos();
         final int chunkX = chunkPos.x;
         final int chunkZ = chunkPos.z;
 
         for (int currSectionY = toSection; currSectionY >= fromSection; --currSectionY) {
-            final SWMRNibbleArray currNibble = this.getNibbleFromCache(chunkX, currSectionY, chunkZ);
-            for (final AxisDirection direction : ONLY_HORIZONTAL_DIRECTIONS) {
-                final int neighbourOffX = direction.x;
-                final int neighbourOffZ = direction.z;
-
-                final SWMRNibbleArray neighbourNibble = this.getNibbleFromCache(chunkX + neighbourOffX,
-                        currSectionY, chunkZ + neighbourOffZ);
-
-                if (neighbourNibble == null || neighbourNibble.isNullNibbleUpdating()) {
-                    continue;
-                }
-
-                if (this.skylightPropagator && currNibble.isNullNibbleUpdating()) {
-                    // TODO in what situation does this happen? Pretty sure it's erroneous.
-                    continue;
-                }
-
-                if (!currNibble.isInitialisedUpdating() && !neighbourNibble.isInitialisedUpdating()) {
-                    // both are zero, nothing to check.
-                    continue;
-                }
-
-                final int incX;
-                final int incZ;
-                final int startX;
-                final int startZ;
-
-                if (neighbourOffX != 0) {
-                    // x direction
-                    incX = 0;
-                    incZ = 1;
-
-                    if (direction.x < 0) {
-                        // negative
-                        startX = chunkX << 4;
-                    } else {
-                        startX = chunkX << 4 | 15;
-                    }
-                    startZ = chunkZ << 4;
-                } else {
-                    // z direction
-                    incX = 1;
-                    incZ = 0;
-
-                    if (neighbourOffZ < 0) {
-                        // negative
-                        startZ = chunkZ << 4;
-                    } else {
-                        startZ = chunkZ << 4 | 15;
-                    }
-                    startX = chunkX << 4;
-                }
-
-                for (int currY = currSectionY << 4, maxY = currY | 15; currY <= maxY; ++currY) {
-                    for (int i = 0, currX = startX, currZ = startZ; i < 16; ++i, currX += incX, currZ += incZ) {
-                        final int neighbourX = currX + neighbourOffX;
-                        final int neighbourZ = currZ + neighbourOffZ;
-
-                        final int currentLevel = currNibble.getUpdating((currX & 15) |
-                                ((currZ & 15)) << 4 |
-                                ((currY & 15) << 8)
-                        );
-                        final int neighbourLevel = neighbourNibble.getUpdating((neighbourX & 15) |
-                                ((neighbourZ & 15)) << 4 |
-                                ((currY & 15) << 8)
-                        );
-
-                        if (currentLevel == neighbourLevel && (currentLevel == 0 || currentLevel == 15)) {
-                            // nothing to check here
-                            continue;
-                        }
-
-                        if (Math.abs(currentLevel - neighbourLevel) == 1) {
-                            final BlockState currentBlock = this.getBlockState(currX, currY, currZ);
-                            final BlockState neighbourBlock = this.getBlockState(neighbourX, currY, neighbourZ);
-
-                            final int currentOpacity = ((ExtendedAbstractBlockState)currentBlock).getOpacityIfCached();
-                            final int neighbourOpacity = ((ExtendedAbstractBlockState)neighbourBlock).getOpacityIfCached();
-                            if (currentOpacity == 0 || currentOpacity == 1 ||
-                                    neighbourOpacity == 0 || neighbourOpacity == 1) {
-                                // looks good
-                                continue;
-                            }
-                        }
-
-                        // setup queue, it looks like something could be inconsistent
-                        this.checkBlock(currX, currY, currZ);
-                        this.checkBlock(neighbourX, currY, neighbourZ);
-                    }
-                }
-            }
+            this.checkChunkEdge(lightAccess, chunk, chunkX, currSectionY, chunkZ);
         }
 
         this.performLightDecrease(lightAccess);
@@ -641,13 +659,27 @@ public abstract class StarLightEngine {
                                                       final Boolean[] emptinessChanges, final boolean unlit);
 
     public final void checkChunkEdges(final ChunkProvider lightAccess, final int chunkX, final int chunkZ) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, false);
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true);
         try {
             final Chunk chunk = this.getChunkInCache(chunkX, chunkZ);
             if (chunk == null) {
                 return;
             }
             this.checkChunkEdges(lightAccess, chunk, -1, 16);
+            this.updateVisible(lightAccess);
+        } finally {
+            this.destroyCaches();
+        }
+    }
+
+    public final void checkChunkEdges(final ChunkProvider lightAccess, final int chunkX, final int chunkZ, final ShortCollection sections) {
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true);
+        try {
+            final Chunk chunk = this.getChunkInCache(chunkX, chunkZ);
+            if (chunk == null) {
+                return;
+            }
+            this.checkChunkEdges(lightAccess, chunk, sections);
             this.updateVisible(lightAccess);
         } finally {
             this.destroyCaches();
@@ -732,13 +764,10 @@ public abstract class StarLightEngine {
     // lower (6 + 6 + 16) = 28 bits: encoded coordinate position (x | (z << 6) | (y << (6 + 6))))
     // next 4 bits: propagated light level (0, 15]
     // next 6 bits: propagation direction bitset
-    // next 23 bits: unused
-    // last 3 bits: state flags
+    // next 24 bits: unused
+    // last 4 bits: state flags
     // state flags:
     // whether the propagation must set the current position's light value (0 if decrease, propagated light level if increase)
-    // used when wanting to delay the setting of a level
-    // this will also re-schedule the queued value, so it will be shuffled to the end of the queue
-    protected static final long FLAG_FORCE_WRITE = Long.MIN_VALUE >>> 2;
     // whether the propagation needs to check if its current level is equal to the expected level
     // used only in increase propagation
     protected static final long FLAG_RECHECK_LEVEL = Long.MIN_VALUE >>> 1;
@@ -788,11 +817,6 @@ public abstract class StarLightEngine {
                     // not at the level we expect, so something changed.
                     continue;
                 }
-            }
-            if ((queueValue & FLAG_FORCE_WRITE) != 0L) {
-                this.setLightLevel(posX, posY, posZ, propagatedLightLevel);
-                queue[queueLength++] = queueValue ^ FLAG_FORCE_WRITE;
-                continue;
             }
 
             if ((queueValue & FLAG_HAS_SIDED_TRANSPARENT_BLOCKS) == 0L) {
@@ -967,12 +991,6 @@ public abstract class StarLightEngine {
             final int posY = (((int)queueValue >>> 12) & ((1 << 16) - 1)) + decodeOffsetY;
             final int propagatedLightLevel = (int)((queueValue >>> (6 + 6 + 16)) & 0xF);
             final AxisDirection[] checkDirections = OLD_CHECK_DIRECTIONS[(int)((queueValue >>> (6 + 6 + 16 + 4)) & 63)];
-
-            if ((queueValue & FLAG_FORCE_WRITE) != 0L) {
-                this.setLightLevel(posX, posY, posZ, 0);
-                queue[queueLength++] = queueValue ^ FLAG_FORCE_WRITE;
-                continue;
-            }
 
             if ((queueValue & FLAG_HAS_SIDED_TRANSPARENT_BLOCKS) == 0L) {
                 // we don't need to worry about our state here.

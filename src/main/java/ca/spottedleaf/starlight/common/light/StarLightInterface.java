@@ -5,6 +5,7 @@ import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
@@ -13,7 +14,6 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.ChunkProvider;
-import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.light.ChunkLightingView;
 import java.util.ArrayDeque;
@@ -342,18 +342,52 @@ public final class StarLightInterface {
     }
 
     public void checkChunkEdges(final int chunkX, final int chunkZ) {
+        this.checkSkyEdges(chunkX, chunkZ);
+        this.checkBlockEdges(chunkX, chunkZ);
+    }
+
+    public void checkSkyEdges(final int chunkX, final int chunkZ) {
         final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
-        final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
 
         try {
             if (skyEngine != null) {
                 skyEngine.checkChunkEdges(this.lightAccess, chunkX, chunkZ);
             }
+        } finally {
+            this.releaseSkyLightEngine(skyEngine);
+        }
+    }
+
+    public void checkBlockEdges(final int chunkX, final int chunkZ) {
+        final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
+        try {
             if (blockEngine != null) {
                 blockEngine.checkChunkEdges(this.lightAccess, chunkX, chunkZ);
             }
         } finally {
+            this.releaseBlockLightEngine(blockEngine);
+        }
+    }
+
+    public void checkSkyEdges(final int chunkX, final int chunkZ, final ShortCollection sections) {
+        final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
+
+        try {
+            if (skyEngine != null) {
+                skyEngine.checkChunkEdges(this.lightAccess, chunkX, chunkZ, sections);
+            }
+        } finally {
             this.releaseSkyLightEngine(skyEngine);
+        }
+    }
+
+    public void checkBlockEdges(final int chunkX, final int chunkZ, final ShortCollection sections) {
+        final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
+        try {
+            if (blockEngine != null) {
+                blockEngine.checkChunkEdges(this.lightAccess, chunkX, chunkZ, sections);
+            }
+        } finally {
             this.releaseBlockLightEngine(blockEngine);
         }
     }

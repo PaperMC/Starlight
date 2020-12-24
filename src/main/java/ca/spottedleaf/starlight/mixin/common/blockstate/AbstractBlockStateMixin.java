@@ -1,4 +1,4 @@
-package ca.spottedleaf.starlight.mixin.blockstate;
+package ca.spottedleaf.starlight.mixin.common.blockstate;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import com.google.common.collect.ImmutableMap;

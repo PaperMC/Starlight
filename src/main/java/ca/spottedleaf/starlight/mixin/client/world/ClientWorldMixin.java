@@ -1,4 +1,4 @@
-package ca.spottedleaf.starlight.mixin.world;
+package ca.spottedleaf.starlight.mixin.client.world;
 
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import net.fabricmc.api.EnvType;

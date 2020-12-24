@@ -3,6 +3,7 @@ package ca.spottedleaf.starlight.common.light;
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
+import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import net.minecraft.block.BlockState;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -280,7 +281,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
     protected final void rewriteNibbleCacheForSkylight(final Chunk chunk) {
         for (int index = 0, max = this.nibbleCache.length; index < max; ++index) {
             final SWMRNibbleArray nibble = this.nibbleCache[index];
-            if (nibble == null || nibble.isNullNibbleUpdating()) {
+            if (nibble != null && nibble.isNullNibbleUpdating()) {
                 // stop propagation in these areas
                 this.nibbleCache[index] = null;
             }
@@ -373,6 +374,19 @@ public final class SkyStarLightEngine extends StarLightEngine {
     }
 
     @Override
+    protected void checkChunkEdges(final ChunkProvider lightAccess, final Chunk chunk, final int fromSection,
+                                   final int toSection) {
+        this.rewriteNibbleCacheForSkylight(chunk);
+        super.checkChunkEdges(lightAccess, chunk, fromSection, toSection);
+    }
+
+    @Override
+    protected void checkChunkEdges(ChunkProvider lightAccess, Chunk chunk, ShortCollection sections) {
+        this.rewriteNibbleCacheForSkylight(chunk);
+        super.checkChunkEdges(lightAccess, chunk, sections);
+    }
+
+    @Override
     protected void checkBlock(final int worldX, final int worldY, final int worldZ) {
         // blocks can change opacity
         // blocks can change direction of propagation
@@ -389,8 +403,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
                     ((worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                             | (currentLevel & 0xFL) << (6 + 6 + 16)
                             | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4))
-                            | FLAG_HAS_SIDED_TRANSPARENT_BLOCKS // don't know if the block is conditionally transparent
-                            | (FLAG_RECHECK_LEVEL); // this source might be set up to decrease
+                            | FLAG_HAS_SIDED_TRANSPARENT_BLOCKS; // don't know if the block is conditionally transparent
         } else {
             this.setLightLevel(worldX, worldY, worldZ, 0);
         }
@@ -429,6 +442,10 @@ public final class SkyStarLightEngine extends StarLightEngine {
             }
         }
 
+        // note: light sets are delayed while processing skylight source changes due to how
+        // nibbles are initialised, as we want to avoid clobbering nibble values so what when
+        // below nibbles are initialised they aren't reading from partially modified nibbles
+
         // now we can recalculate the sources for the changed columns
         for (int index = 0; index < (16 * 16); ++index) {
             final int maxY = this.heightMapBlockChange[index];
@@ -442,7 +459,8 @@ public final class SkyStarLightEngine extends StarLightEngine {
             final int columnZ = (index >>> 4) | (chunkZ << 4);
 
             // try and propagate from the above y
-            final int maxPropagationY = this.tryPropagateSkylight(world, columnX, maxY, columnZ, true);
+            // delay light set until after processing all sources to setup
+            final int maxPropagationY = this.tryPropagateSkylight(world, columnX, maxY, columnZ, true, true);
 
             // maxPropagationY is now the highest block that could not be propagated to
 
@@ -474,15 +492,20 @@ public final class SkyStarLightEngine extends StarLightEngine {
                         break;
                     }
 
+                    // delay light set until after processing all sources to setup
                     this.decreaseQueue[this.decreaseQueueInitialLength++] =
                             ((columnX + (columnZ << 6) + (currY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                     | (15L << (6 + 6 + 16))
-                                    | (propagateDirection << (6 + 6 + 16 + 4))
-                                    | FLAG_FORCE_WRITE; // overwriting the nibble value affects init of dummy nibbles
+                                    | (propagateDirection << (6 + 6 + 16 + 4));
                                     // do not set transparent blocks for the same reason we don't in the checkBlock method
                 }
             }
         }
+
+        // delayed light sets are processed here, and must be processed before checkBlock as checkBlock reads
+        // immediate light value
+        this.processDelayedIncreases();
+        this.processDelayedDecreases();
 
         for (final BlockPos pos : positions) {
             this.checkBlock(pos.getX(), pos.getY(), pos.getZ());
@@ -693,7 +716,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
                     this.increaseQueueInitialLength = queueLength;
                     // Just in case there's a conditionally transparent block at the top.
-                    this.tryPropagateSkylight(world, worldX, heightMapC, worldZ, false);
+                    this.tryPropagateSkylight(world, worldX, heightMapC, worldZ, false, false);
                 }
             }
         } // else: apparently the chunk is empty
@@ -716,8 +739,48 @@ public final class SkyStarLightEngine extends StarLightEngine {
         }
     }
 
+    protected final void processDelayedIncreases() {
+        // copied from performLightIncrease
+        final long[] queue = this.increaseQueue;
+        final int decodeOffsetX = -this.encodeOffsetX;
+        final int decodeOffsetY = -this.encodeOffsetY;
+        final int decodeOffsetZ = -this.encodeOffsetZ;
+
+        for (int i = 0, len = this.increaseQueueInitialLength; i < len; ++i) {
+            final long queueValue = queue[i];
+
+            final int posX = ((int)queueValue & 63) + decodeOffsetX;
+            final int posZ = (((int)queueValue >>> 6) & 63) + decodeOffsetZ;
+            final int posY = (((int)queueValue >>> 12) & ((1 << 16) - 1)) + decodeOffsetY;
+            final int propagatedLightLevel = (int)((queueValue >>> (6 + 6 + 16)) & 0xF);
+
+            this.setLightLevel(posX, posY, posZ, propagatedLightLevel);
+        }
+    }
+
+    protected final void processDelayedDecreases() {
+        // copied from performLightDecrease
+        final long[] queue = this.decreaseQueue;
+        final int decodeOffsetX = -this.encodeOffsetX;
+        final int decodeOffsetY = -this.encodeOffsetY;
+        final int decodeOffsetZ = -this.encodeOffsetZ;
+
+        for (int i = 0, len = this.decreaseQueueInitialLength; i < len; ++i) {
+            final long queueValue = queue[i];
+
+            final int posX = ((int)queueValue & 63) + decodeOffsetX;
+            final int posZ = (((int)queueValue >>> 6) & 63) + decodeOffsetZ;
+            final int posY = (((int)queueValue >>> 12) & ((1 << 16) - 1)) + decodeOffsetY;
+
+            this.setLightLevel(posX, posY, posZ, 0);
+        }
+    }
+
+    // delaying the light set is useful for block changes since they need to worry about initialising nibblearrays
+    // while also queueing light at the same time (initialising nibblearrays might depend on nibbles above, so
+    // clobbering the light values will result in broken propagation)
     protected final int tryPropagateSkylight(final BlockView world, final int worldX, int startY, final int worldZ,
-                                             final boolean extrudeInitialised) {
+                                             final boolean extrudeInitialised, final boolean delayLightSet) {
         final BlockPos.Mutable mutablePos = this.mutablePos3;
         final int encodeOffset = this.coordinateOffset;
         final long propagateDirection = AxisDirection.POSITIVE_Y.everythingButThisDirection; // just don't check upwards.
@@ -765,14 +828,14 @@ public final class SkyStarLightEngine extends StarLightEngine {
                 }
                 // most of the time it falls here.
                 // add to propagate
+                // light set delayed until we determine if this nibble section is null
                 this.increaseQueue[this.increaseQueueInitialLength++] =
                         ((worldX + (worldZ << 6) + (startY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                 | (15L << (6 + 6 + 16)) // we know we're at full lit here
-                                | (propagateDirection << (6 + 6 + 16 + 4))
-                                | FLAG_FORCE_WRITE; // overwriting the nibble value affects init of dummy nibbles
+                                | (propagateDirection << (6 + 6 + 16 + 4));
             } else {
                 mutablePos.set(worldX, startY, worldZ);
-                long flags = FLAG_FORCE_WRITE; // overwriting the nibble value affects init of dummy nibbles
+                long flags = 0L;
                 if (((ExtendedAbstractBlockState)current).isConditionallyFullOpaque()) {
                     final VoxelShape cullingFace = current.getCullingFace(world, mutablePos, AxisDirection.POSITIVE_Y.nms);
 
@@ -789,6 +852,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
                     break;
                 }
 
+                // light set delayed until we determine if this nibble section is null
                 this.increaseQueue[this.increaseQueueInitialLength++] =
                         ((worldX + (worldZ << 6) + (startY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                 | (15L << (6 + 6 + 16)) // we know we're at full lit here
@@ -812,6 +876,8 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
                 // make sure this is marked as AIR
                 above = AIR_BLOCK_STATE;
+            } else if (!delayLightSet) {
+                this.setLightLevel(worldX, startY, worldZ, 15);
             }
         }
 

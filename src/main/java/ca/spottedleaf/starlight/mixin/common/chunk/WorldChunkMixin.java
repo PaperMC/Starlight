@@ -1,4 +1,4 @@
-package ca.spottedleaf.starlight.mixin.chunk;
+package ca.spottedleaf.starlight.mixin.common.chunk;
 
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;

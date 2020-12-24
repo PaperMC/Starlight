@@ -24,3 +24,7 @@ accessible method net/minecraft/server/world/ThreadedAnvilChunkStorage getCurren
 accessible method net/minecraft/server/world/ThreadedAnvilChunkStorage getChunkHolder (J)Lnet/minecraft/server/world/ChunkHolder;
 accessible method net/minecraft/server/world/ThreadedAnvilChunkStorage getCompletedLevelSupplier (J)Ljava/util/function/IntSupplier;
 accessible method net/minecraft/server/world/ThreadedAnvilChunkStorage releaseLightTicket (Lnet/minecraft/util/math/ChunkPos;)V
+
+
+# ServerLightingProvider
+accessible class net/minecraft/server/world/ServerLightingProvider$Stage

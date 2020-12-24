@@ -1,4 +1,4 @@
-package ca.spottedleaf.starlight.mixin.world;
+package ca.spottedleaf.starlight.mixin.common.world;
 
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
@@ -25,7 +25,8 @@ public abstract class ChunkSerializerMixin {
 
     private static final int STARLIGHT_LIGHT_VERSION = 1;
 
-    private static final String UNINITIALISED_SKYLIGHT_TAG = "starlight.skylight_";
+    private static final String UNINITIALISED_SKYLIGHT_TAG = "starlight.skylight_uninit";
+    private static final String STARLIGHT_VERSION_TAG = "starlight.light_version";
 
     /**
      * Overwrites vanilla's light data with our own.
@@ -51,7 +52,7 @@ public abstract class ChunkSerializerMixin {
         // diff start - store our tag for whether light data is init'd
         if (lit) {
             level.putBoolean("isLightOn", false);
-            level.putInt("starlight.light_versiom", STARLIGHT_LIGHT_VERSION);
+            level.putInt(STARLIGHT_VERSION_TAG, STARLIGHT_LIGHT_VERSION);
         }
         // diff end - store our tag for whether light data is init'd
         ChunkStatus status = ChunkStatus.byId(level.getString("Status"));
@@ -90,10 +91,8 @@ public abstract class ChunkSerializerMixin {
                     }
 
                     if (skyNibble != null) {
-                        // for skylight compatibility with vanilla, we store our data in a different key.
                         if (skyNibble.isUninitialized()) {
-                            // different key lets use do this
-                            section.putBoolean("starlight.skylight_uninit", true);
+                            section.putBoolean(UNINITIALISED_SKYLIGHT_TAG, true);
                         } else {
                             // we store under the same key so mod programs editing nbt
                             // can still read the data, hopefully.
@@ -140,7 +139,7 @@ public abstract class ChunkSerializerMixin {
 
         // start copy from from the original method
         CompoundTag levelTag = tag.getCompound("Level");
-        boolean lit = levelTag.getInt("starlight.light_versiom") == STARLIGHT_LIGHT_VERSION; ret.setLightOn(lit); // diff - override lit with our value
+        boolean lit = levelTag.getInt(STARLIGHT_VERSION_TAG) == STARLIGHT_LIGHT_VERSION; ret.setLightOn(lit); // diff - override lit with our value
         boolean canReadSky = world.getDimension().hasSkyLight();
         ChunkStatus status = ChunkStatus.byId(tag.getCompound("Level").getString("Status"));
         if (lit && status.isAtLeast(ChunkStatus.LIGHT)) { // diff - we add the status check here
@@ -156,7 +155,6 @@ public abstract class ChunkSerializerMixin {
                 }
 
                 if (canReadSky) {
-                    // for skylight compatibility with vanilla, we store our data in a different key.
                     if (sectionData.contains("SkyLight", 7)) {
                         // we store under the same key so mod programs editing nbt
                         // can still read the data, hopefully.
@@ -164,7 +162,7 @@ public abstract class ChunkSerializerMixin {
                         // is forced to re-light them if it encounters our data. It's too much of a burden
                         // to try and maintain compatibility with a broken and inferior skylight management system.
                         skyNibbles[y - minSection] = new SWMRNibbleArray(sectionData.getByteArray("SkyLight").clone()); // clone for data safety
-                    } else if (sectionData.getBoolean("starlight.skylight_uninit")) {
+                    } else if (sectionData.getBoolean(UNINITIALISED_SKYLIGHT_TAG)) {
                         skyNibbles[y - minSection] = new SWMRNibbleArray();
                     }
                 }

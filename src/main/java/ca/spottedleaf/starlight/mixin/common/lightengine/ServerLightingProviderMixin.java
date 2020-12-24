@@ -1,17 +1,14 @@
-package ca.spottedleaf.starlight.mixin.lightengine;
+package ca.spottedleaf.starlight.mixin.common.lightengine;
 
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.light.StarLightInterface;
 import ca.spottedleaf.starlight.common.light.StarLightLightingProvider;
-import net.minecraft.server.world.ChunkTaskPrioritySystem;
 import net.minecraft.server.world.ServerLightingProvider;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.world.ThreadedAnvilChunkStorage;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.thread.MessageListener;
-import net.minecraft.util.thread.TaskExecutor;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkNibbleArray;
@@ -25,9 +22,6 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.IntSupplier;
 
 @Mixin(ServerLightingProvider.class)
 public abstract class ServerLightingProviderMixin extends LightingProvider implements StarLightLightingProvider {
@@ -38,52 +32,16 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
 
     @Final
     @Shadow
-    private MessageListener<ChunkTaskPrioritySystem.Task<Runnable>> executor;
-
-    @Final
-    @Shadow
-    private AtomicBoolean ticking;
-
-    @Final
-    @Shadow
-    private TaskExecutor<Runnable> processor;
-
-    @Final
-    @Shadow
     private static Logger LOGGER;
 
-    @Unique
-    protected final ConcurrentLinkedQueue<Runnable> preTasks = new ConcurrentLinkedQueue<>();
-
-    @Unique
-    protected final ConcurrentLinkedQueue<Runnable> postTasks = new ConcurrentLinkedQueue<>();
-
-    @Unique
-    private void enqueue(final int x, final int z, final Runnable task) {
-        this.enqueue(x, z, task, false);
-    }
-
-    @Unique
-    private void enqueue(final int x, final int z, final Runnable task, final boolean postTask) {
-        this.enqueue(x, z, this.chunkStorage.getCompletedLevelSupplier(ChunkPos.toLong(x, z)), postTask, task);
-    }
-
-    @Unique
-    private void enqueue(final int x, final int z, final IntSupplier completedLevelSupplier, final boolean postTask,
-                         final Runnable task) {
-        this.executor.send(ChunkTaskPrioritySystem.createMessage(() -> {
-            if (postTask) {
-                this.postTasks.add(task);
-            } else {
-                this.preTasks.add(task);
-            }
-        }, ChunkPos.toLong(x, z), completedLevelSupplier));
-    }
+    @Shadow
+    protected abstract void enqueue(final int x, final int z, final ServerLightingProvider.Stage stage, final Runnable task);
 
     public ServerLightingProviderMixin(final ChunkProvider chunkProvider, final boolean hasBlockLight, final boolean hasSkyLight) {
         super(chunkProvider, hasBlockLight, hasSkyLight);
     }
 
+    @Unique
     private long workTicketCounts = 0L;
 
     @Unique
@@ -91,6 +49,14 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
         // TODO this impl is actually fucking awful for checking neighbours and keeping neighbours, for the love of god rewrite it
 
         final ServerWorld world = (ServerWorld)this.getLightEngine().getWorld();
+
+        if (!world.getChunkManager().threadedAnvilChunkStorage.mainThreadExecutor.isOnThread()) {
+            // this is not safe to run off-main, re-schedule
+            world.getChunkManager().threadedAnvilChunkStorage.mainThreadExecutor.execute(() -> {
+                this.queueTaskForSection(chunkX, chunkY, chunkZ, runnable);
+            });
+            return;
+        }
 
         Chunk center = this.getLightEngine().getAnyChunkNow(chunkX, chunkZ);
         if (center == null || !center.getStatus().isAtLeast(ChunkStatus.LIGHT) || !center.isLightOn()) {
@@ -109,17 +75,19 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
 
         world.getChunkManager().addTicket(StarLightInterface.CHUNK_WORK_TICKET, new ChunkPos(chunkX, chunkZ), 0, ticketId);
 
-        this.enqueue(chunkX, chunkZ, () -> {
+        this.enqueue(chunkX, chunkZ, ServerLightingProvider.Stage.PRE_UPDATE, () -> {
             runnable.run();
-            this.enqueue(chunkX, chunkZ, () -> {
+            this.enqueue(chunkX, chunkZ, ServerLightingProvider.Stage.POST_UPDATE, () -> {
                 world.getChunkManager().threadedAnvilChunkStorage.mainThreadExecutor.execute(() -> {
                     world.getChunkManager().removeTicket(StarLightInterface.CHUNK_WORK_TICKET, new ChunkPos(chunkX, chunkZ), 0, ticketId);
                 });
-            }, true);
+            });
         });
     }
 
     /**
+     * @reason Redirect scheduling call away from the vanilla light engine, as well as enforce
+     * that chunk neighbours are loaded before the processing can occur
      * @author Spottedleaf
      */
     @Overwrite
@@ -131,14 +99,16 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
     }
 
     /**
+     * @reason Avoid messing with the vanilla light engine state
      * @author Spottedleaf
      */
     @Overwrite
-    public void updateChunkStatus(final ChunkPos pos) {
-        // Do nothing, we don't care
-    }
+    public void updateChunkStatus(final ChunkPos pos) {}
 
     /**
+     * @reason Redirect to schedule for our own logic, as well as ensure 1 radius neighbours
+     * are loaded
+     * Note: Our scheduling logic will discard this call if the chunk is not lit, unloaded, or not at LIGHT stage yet.
      * @author Spottedleaf
      */
     @Overwrite
@@ -149,6 +119,7 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
     }
 
     /**
+     * @reason Avoid messing with the vanilla light engine state
      * @author Spottedleaf
      */
     @Overwrite
@@ -157,15 +128,18 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
     }
 
     /**
+     * @reason Light data is now attached to chunks, and this means we need to hook into chunk loading logic
+     * to load the data rather than rely on this call. This call also would mess with the vanilla light engine state.
      * @author Spottedleaf
      */
     @Overwrite
     public void enqueueSectionData(final LightType lightType, final ChunkSectionPos pos, final ChunkNibbleArray nibbles,
                                    final boolean bl) {
-        // hook for loading light data is changed, as chunk is no longer loaded at this stage
+        // load hooks inside ChunkSerializer
     }
 
     /**
+     * @reason Avoid messing with the vanilla light engine state
      * @author Spottedleaf
      */
     @Overwrite
@@ -174,34 +148,7 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
     }
 
     /**
-     * @author Spottedleaf
-     */
-    @Overwrite
-    public void tick() {
-        if ((!this.preTasks.isEmpty() || !this.postTasks.isEmpty() || super.hasUpdates()) && this.ticking.compareAndSet(false, true)) {
-            this.processor.send(() -> {
-                this.runTasks();
-                this.ticking.set(false);
-                this.tick();
-            });
-        }
-    }
-    /**
-     * @author Spottedleaf
-     */
-    @Overwrite
-    private void runTasks() {
-        Runnable task;
-        while ((task = this.preTasks.poll()) != null) {
-            task.run();
-        }
-        this.getLightEngine().propagateChanges();
-        while ((task = this.postTasks.poll()) != null) {
-            task.run();
-        }
-    }
-
-    /**
+     * @reason Route to new logic to either light or just load the data
      * @author Spottedleaf
      */
     @Overwrite
@@ -220,7 +167,7 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
             this.chunkStorage.releaseLightTicket(chunkPos);
             return chunk;
         }, (runnable) -> {
-            this.enqueue(chunkPos.x, chunkPos.z, runnable);
+            this.enqueue(chunkPos.x, chunkPos.z, ServerLightingProvider.Stage.PRE_UPDATE, runnable);
         }).whenComplete((final Chunk c, final Throwable throwable) -> {
             if (throwable != null) {
                 LOGGER.fatal("Failed to light chunk " + chunkPos, throwable);
