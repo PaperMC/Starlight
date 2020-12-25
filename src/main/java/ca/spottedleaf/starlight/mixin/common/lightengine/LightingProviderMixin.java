@@ -134,10 +134,10 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
     }
 
     @Unique
-    protected final Long2ObjectOpenHashMap<SWMRNibbleArray[]> blockLight = new Long2ObjectOpenHashMap<>();
+    protected final Long2ObjectOpenHashMap<SWMRNibbleArray[]> blockLightMap = new Long2ObjectOpenHashMap<>();
 
     @Unique
-    protected final Long2ObjectOpenHashMap<SWMRNibbleArray[]> skyLight = new Long2ObjectOpenHashMap<>();
+    protected final Long2ObjectOpenHashMap<SWMRNibbleArray[]> skyLightMap = new Long2ObjectOpenHashMap<>();
 
     @Unique
     protected final Long2ObjectOpenHashMap<Boolean[]> queuedChunkLoads = new Long2ObjectOpenHashMap<>();
@@ -156,8 +156,8 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
     public void setColumnEnabled(final ChunkPos pos, final boolean lightEnabled) {
         final Chunk chunk = this.getLightEngine().getAnyChunkNow(pos.x, pos.z);
         if (chunk != null) {
-            final SWMRNibbleArray[] blockNibbles = this.blockLight.get(CoordinateUtils.getChunkKey(pos));
-            final SWMRNibbleArray[] skyNibbles = this.skyLight.get(CoordinateUtils.getChunkKey(pos));
+            final SWMRNibbleArray[] blockNibbles = this.blockLightMap.get(CoordinateUtils.getChunkKey(pos));
+            final SWMRNibbleArray[] skyNibbles = this.skyLightMap.get(CoordinateUtils.getChunkKey(pos));
             if (blockNibbles != null) {
                 ((ExtendedChunk)chunk).setBlockNibbles(blockNibbles);
             }
@@ -167,8 +167,8 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
 
             this.queuedChunkLoads.put(CoordinateUtils.getChunkKey(pos), StarLightEngine.getEmptySectionsForChunk(chunk));
         } else if (!lightEnabled) {
-            this.blockLight.remove(CoordinateUtils.getChunkKey(pos));
-            this.skyLight.remove(CoordinateUtils.getChunkKey(pos));
+            this.blockLightMap.remove(CoordinateUtils.getChunkKey(pos));
+            this.skyLightMap.remove(CoordinateUtils.getChunkKey(pos));
             this.queuedChunkLoads.remove(CoordinateUtils.getChunkKey(pos));
             this.queuedEdgeChecksBlock.remove(CoordinateUtils.getChunkKey(pos));
             this.queuedEdgeChecksSky.remove(CoordinateUtils.getChunkKey(pos));
@@ -195,7 +195,7 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
         final Chunk chunk = this.getLightEngine().getAnyChunkNow(pos.getX(), pos.getZ());
         switch (lightType) {
             case BLOCK: {
-                final SWMRNibbleArray[] blockNibbles = this.blockLight.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
+                final SWMRNibbleArray[] blockNibbles = this.blockLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
                     return StarLightEngine.getFilledEmptyLight();
                 });
 
@@ -217,7 +217,7 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
                 break;
             }
             case SKY: {
-                final SWMRNibbleArray[] skyNibbles = this.skyLight.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
+                final SWMRNibbleArray[] skyNibbles = this.skyLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
                     return StarLightEngine.getFilledEmptyLight();
                 });
 

@@ -38,6 +38,11 @@ public final class BlockStarLightEngine extends StarLightEngine {
     }
 
     @Override
+    protected boolean[][] getEmptinessMap(final Chunk chunk) {
+        return null;
+    }
+
+    @Override
     protected void handleEmptySectionChanges(final ChunkProvider lightAccess, final Chunk chunk,
                                              final Boolean[] emptinessChanges, final boolean unlit) {}
 

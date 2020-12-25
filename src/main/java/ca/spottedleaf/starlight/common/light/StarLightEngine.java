@@ -98,6 +98,9 @@ public abstract class StarLightEngine {
     // index = x + (z * 5)
     protected final Chunk[] chunkCache = new Chunk[5 * 5];
 
+    // index = x + (z * 5)
+    protected final boolean[][][] emptinessMapCache = new boolean[5 * 5][][];
+
     protected final BlockPos.Mutable mutablePos1 = new BlockPos.Mutable();
     protected final BlockPos.Mutable mutablePos2 = new BlockPos.Mutable();
     protected final BlockPos.Mutable mutablePos3 = new BlockPos.Mutable();
@@ -176,6 +179,7 @@ public abstract class StarLightEngine {
                 this.setChunkInCache(cx, cz, chunk);
                 this.setBlocksForChunkInCache(cx, cz, chunk.getSectionArray());
                 this.setNibblesForChunkInCache(cx, cz, this.getNibblesOnChunk(chunk));
+                this.setEmptinessMapCache(cx, cz, this.getEmptinessMap(chunk));
             }
         }
     }
@@ -247,6 +251,7 @@ public abstract class StarLightEngine {
         Arrays.fill(this.sectionCache, null);
         Arrays.fill(this.nibbleCache, null);
         Arrays.fill(this.chunkCache, null);
+        Arrays.fill(this.emptinessMapCache, null);
         if (this.isClientSide) {
             Arrays.fill(this.notifyUpdateCache, false);
         }
@@ -349,6 +354,14 @@ public abstract class StarLightEngine {
         }
     }
 
+    protected final boolean[][] getEmptinessMap(final int chunkX, final int chunkZ) {
+        return this.emptinessMapCache[chunkX + 5*chunkZ + this.chunkIndexOffset];
+    }
+
+    protected final void setEmptinessMapCache(final int chunkX, final int chunkZ, final boolean[][] emptinessMap) {
+        this.emptinessMapCache[chunkX + 5*chunkZ + this.chunkIndexOffset] = emptinessMap;
+    }
+
     public static SWMRNibbleArray[] getFilledEmptyLight() {
         final SWMRNibbleArray[] ret = getEmptyLightArray();
 
@@ -363,13 +376,14 @@ public abstract class StarLightEngine {
         return new SWMRNibbleArray[16 - (-1) + 1];
     }
 
+    protected abstract boolean[][] getEmptinessMap(final Chunk chunk);
+
     protected abstract SWMRNibbleArray[] getNibblesOnChunk(final Chunk chunk);
 
     protected abstract void setNibbles(final Chunk chunk, final SWMRNibbleArray[] to);
 
     protected abstract boolean canUseChunk(final Chunk chunk);
 
-    // TODO include section changes
     public final void blocksChangedInChunk(final ChunkProvider lightAccess, final int chunkX, final int chunkZ,
                                            final Set<BlockPos> positions, final Boolean[] changedSections) {
         this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, this.isClientSide);
@@ -410,7 +424,7 @@ public abstract class StarLightEngine {
             final SWMRNibbleArray neighbourNibble = this.getNibbleFromCache(chunkX + neighbourOffX,
                     chunkY, chunkZ + neighbourOffZ);
 
-            if (neighbourNibble == null || neighbourNibble.isNullNibbleUpdating()) {
+            if (neighbourNibble == null) {
                 continue;
             }
 
@@ -527,7 +541,7 @@ public abstract class StarLightEngine {
 
         for (int currSectionY = toSection; currSectionY >= fromSection; --currSectionY) {
             final SWMRNibbleArray currNibble = this.getNibbleFromCache(chunkX, currSectionY, chunkZ);
-            if (this.skylightPropagator && currNibble == null) {
+            if (currNibble == null) {
                 continue;
             }
             for (final AxisDirection direction : ONLY_HORIZONTAL_DIRECTIONS) {
@@ -537,16 +551,7 @@ public abstract class StarLightEngine {
                 final SWMRNibbleArray neighbourNibble = this.getNibbleFromCache(chunkX + neighbourOffX,
                         currSectionY, chunkZ + neighbourOffZ);
 
-                if (neighbourNibble == null || neighbourNibble.isNullNibbleUpdating()) {
-                    continue;
-                }
-
-                if (this.skylightPropagator && currNibble.isNullNibbleUpdating()) {
-                    // TODO in what situation does this happen? Pretty sure it's erroneous.
-                    continue;
-                }
-
-                if (!neighbourNibble.isInitialisedUpdating()) {
+                if (neighbourNibble == null || !neighbourNibble.isInitialisedUpdating()) {
                     // can't pull from 0
                     continue;
                 }
@@ -588,9 +593,9 @@ public abstract class StarLightEngine {
                 for (int currY = currSectionY << 4, maxY = currY | 15; currY <= maxY; ++currY) {
                     for (int i = 0, currX = startX, currZ = startZ; i < 16; ++i, currX += incX, currZ += incZ) {
                         final int level = neighbourNibble.getUpdating(
-                                (currX & 15) |
-                                (currZ & 15) << 4 |
-                                (currY & 15) << 8
+                                (currX & 15)
+                                        | ((currZ & 15) << 4)
+                                        | ((currY & 15) << 8)
                         );
 
                         if (level <= 1) {
@@ -627,7 +632,7 @@ public abstract class StarLightEngine {
 
     public final void handleEmptySectionChanges(final ChunkProvider lightAccess, final int chunkX, final int chunkZ,
                                                 final Boolean[] emptinessChanges) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true);
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, this.isClientSide);
         if (this.isClientSide) {
             // force current chunk into cache
             final Chunk chunk =  (Chunk)lightAccess.getChunk(chunkX, chunkZ);
@@ -638,6 +643,7 @@ public abstract class StarLightEngine {
             this.setChunkInCache(chunkX, chunkZ, chunk);
             this.setBlocksForChunkInCache(chunkX, chunkZ, chunk.getSectionArray());
             this.setNibblesForChunkInCache(chunkX, chunkZ, this.getNibblesOnChunk(chunk));
+            this.setEmptinessMapCache(chunkX, chunkZ, this.getEmptinessMap(chunk));
         }
         try {
             final Chunk chunk = this.getChunkInCache(chunkX, chunkZ);
@@ -701,6 +707,7 @@ public abstract class StarLightEngine {
         this.setChunkInCache(chunkX, chunkZ, chunk);
         this.setBlocksForChunkInCache(chunkX, chunkZ, chunk.getSectionArray());
         this.setNibblesForChunkInCache(chunkX, chunkZ, this.getNibblesOnChunk(chunk));
+        this.setEmptinessMapCache(chunkX, chunkZ, this.getEmptinessMap(chunk));
 
         try {
             this.handleEmptySectionChanges(lightAccess, chunk, emptySections, true);
@@ -721,10 +728,13 @@ public abstract class StarLightEngine {
         this.setupEncodeOffset(chunkPos.x * 16 + 7, 128, chunkPos.z * 16 + 7);
 
         try {
+            final SWMRNibbleArray[] chunkNibbles = getFilledEmptyLight();
+
             this.setChunkInCache(chunkPos.x, chunkPos.z, chunk);
             this.setBlocksForChunkInCache(chunkPos.x, chunkPos.z, chunk.getSectionArray());
-            final SWMRNibbleArray[] chunkNibbles = getFilledEmptyLight();
             this.setNibblesForChunkInCache(chunkPos.x, chunkPos.z, chunkNibbles);
+            this.setEmptinessMapCache(chunkPos.x, chunkPos.z, new boolean[9][]);
+
             this.handleEmptySectionChanges(lightAccess, chunk, getEmptySectionsForChunk(chunk), true);
             this.lightChunk(lightAccess, chunk, false);
 
@@ -745,7 +755,9 @@ public abstract class StarLightEngine {
                     this.setChunkInCache(cx, cz, neighbourChunk);
                     this.setBlocksForChunkInCache(cx, cz, neighbourChunk.getSectionArray());
                     this.setNibblesForChunkInCache(cx, cz, getFilledEmptyLight());
-                    this.handleEmptySectionChanges(lightAccess, chunk, getEmptySectionsForChunk(neighbourChunk), true);
+                    this.setEmptinessMapCache(cx, cz, new boolean[9][]);
+
+                    this.handleEmptySectionChanges(lightAccess, neighbourChunk, getEmptySectionsForChunk(neighbourChunk), true);
                     this.lightChunk(lightAccess, neighbourChunk, false);
                 }
             }

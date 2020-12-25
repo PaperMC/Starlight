@@ -14,7 +14,6 @@ import net.minecraft.world.dimension.DimensionType;
 import org.spongepowered.asm.mixin.Mixin;
 import java.util.function.Supplier;
 
-@Environment(EnvType.CLIENT)
 @Mixin(ClientWorld.class)
 public abstract class ClientWorldMixin extends World implements ExtendedWorld {
 

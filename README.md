@@ -1,4 +1,4 @@
-Starlight (BETA)
+Starlight (Fabric) (BETA)
 ==
 Fabric mod for completely rewriting the vanilla light engine.
 

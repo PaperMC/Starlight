@@ -64,22 +64,29 @@ public final class StarLightInterface {
                     return null;
                 }
 
-                return ((ExtendedChunk)chunk).getSkyNibbles()[pos.getY() + 1].toVanillaNibble();
+                return ((ExtendedChunk)chunk).getSkyNibbles()[sectionY + 1].toVanillaNibble();
             }
 
             @Override
             public int getLightLevel(final BlockPos blockPos) {
-                final Chunk chunk = StarLightInterface.this.getAnyChunkNow(blockPos.getX() >> 4, blockPos.getZ() >> 4);
+                final int x = blockPos.getX();
+                int y = blockPos.getY();
+                final int z = blockPos.getZ();
+
+                final Chunk chunk = StarLightInterface.this.getAnyChunkNow(x >> 4, z >> 4);
                 if (chunk == null || (!StarLightInterface.this.isClientSide && !chunk.isLightOn()) || !chunk.getStatus().isAtLeast(ChunkStatus.LIGHT)) {
                     return 15;
                 }
 
-                final int sectionY = blockPos.getY() >> 4;
+                int sectionY = y >> 4;
 
                 if (sectionY > 16) {
                     return 15;
-                } else if (sectionY < -1) {
-                    return 0;
+                }
+
+                if (sectionY < -1) {
+                    y = -16;
+                    sectionY = -1;
                 }
 
                 final SWMRNibbleArray[] nibbles = ((ExtendedChunk)chunk).getSkyNibbles();
@@ -87,11 +94,11 @@ public final class StarLightInterface {
 
                 if (StarLightInterface.this.isClientSide) {
                     if (!immediate.isNullNibbleUpdating()) {
-                        return immediate.getUpdating(blockPos.getX(), blockPos.getY(), blockPos.getZ());
+                        return immediate.getUpdating(x, y, z);
                     }
                 } else {
                     if (!immediate.isNullNibbleVisible()) {
-                        return immediate.getVisible(blockPos.getX(), blockPos.getY(), blockPos.getZ());
+                        return immediate.getVisible(x, y, z);
                     }
                 }
 
@@ -123,11 +130,11 @@ public final class StarLightInterface {
                     final SWMRNibbleArray nibble = nibbles[currY + 1];
                     if (StarLightInterface.this.isClientSide) {
                         if (!nibble.isNullNibbleUpdating()) {
-                            return nibble.getUpdating(blockPos.getX(), 0, blockPos.getZ());
+                            return nibble.getUpdating(x, 0, z);
                         }
                     } else {
                         if (!nibble.isNullNibbleVisible()) {
-                            return nibble.getVisible(blockPos.getX(), 0, blockPos.getZ());
+                            return nibble.getVisible(x, 0, z);
                         }
                     }
                 }
@@ -138,18 +145,18 @@ public final class StarLightInterface {
 
             @Override
             public void setSectionStatus(final ChunkSectionPos pos, final boolean notReady) {
-                return; // don't care.
+                StarLightInterface.this.sectionChange(pos, notReady);
             }
         };
         this.blockReader = !hasBlockLight ? ChunkLightingView.Empty.INSTANCE : new ChunkLightingView() {
             @Override
-            public ChunkNibbleArray getLightSection(ChunkSectionPos pos) {
+            public ChunkNibbleArray getLightSection(final ChunkSectionPos pos) {
                 final Chunk chunk = StarLightInterface.this.getAnyChunkNow(pos.getX(), pos.getZ());
                 return chunk != null ? ((ExtendedChunk)chunk).getBlockNibbles()[pos.getY() + 1].toVanillaNibble() : null;
             }
 
             @Override
-            public int getLightLevel(BlockPos blockPos) {
+            public int getLightLevel(final BlockPos blockPos) {
                 final int cx = blockPos.getX() >> 4;
                 final int cy = blockPos.getY() >> 4;
                 final int cz = blockPos.getZ() >> 4;
@@ -174,7 +181,7 @@ public final class StarLightInterface {
 
             @Override
             public void setSectionStatus(final ChunkSectionPos pos, final boolean notReady) {
-                return; // don't care.
+                return; // block engine doesn't care
             }
         };
     }

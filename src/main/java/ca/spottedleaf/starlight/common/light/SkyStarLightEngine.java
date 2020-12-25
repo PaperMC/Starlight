@@ -49,6 +49,8 @@ public final class SkyStarLightEngine extends StarLightEngine {
         final int chunkX = chunk.getPos().x;
         final int chunkZ = chunk.getPos().z;
 
+        final boolean[][] chunkEmptinessMap = this.getEmptinessMap(chunkX, chunkZ);
+
         // index = (cx + 2) + 5*(cz + 2)
         long loadedNeighboursBitset = 0L;
         long unloadedNeighbourBitset = 0L;
@@ -60,7 +62,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
                     continue;
                 }
 
-                final boolean[][] neighbourEmptinessMap = ((ExtendedChunk)neighbour).getEmptinessMap();
+                final boolean[][] neighbourEmptinessMap = this.getEmptinessMap(dx + chunkX, dz + chunkZ);
                 for (int i = 0; i < neighbourEmptinessMap.length; ++i) {
                     // index = (cx + 1) + 3*(cz + 1)
                     final int dx2 = (i % 3) - 1;
@@ -80,13 +82,10 @@ public final class SkyStarLightEngine extends StarLightEngine {
         loadedNeighboursBitset |=  1L << ((0 + 2) + 5*(0 + 2));
 
         final boolean[] needsDeInitCheck = new boolean[9];
-        final boolean needsInit = ((ExtendedChunk)chunk).getEmptinessMap()[ExtendedChunk.getEmptinessMapIndex(0, 0)] == null;
+        final boolean needsInit = unlit || chunkEmptinessMap[ExtendedChunk.getEmptinessMapIndex(0, 0)] == null;
         if (needsInit) {
-            ((ExtendedChunk)chunk).getEmptinessMap()[ExtendedChunk.getEmptinessMapIndex(0, 0)] = new boolean[16];
+            chunkEmptinessMap[ExtendedChunk.getEmptinessMapIndex(0, 0)] = new boolean[16];;
         }
-
-        // index = (cx + 2) + 5*(cz + 2)
-        final boolean[][] chunkEmptinessMap = ((ExtendedChunk)chunk).getEmptinessMap();
 
         // this chunk is new, so we need to init neighbours
         // because this chunk might have been modified inbetween loading/saving, we have to rewrite the emptiness map
@@ -99,19 +98,20 @@ public final class SkyStarLightEngine extends StarLightEngine {
                     // when it does though, it'll come by and initialise our map for it
                     continue;
                 }
+                final boolean[][] neighbourEmptinessMap = this.getEmptinessMap(dx + chunkX, dz + chunkZ);
 
                 if (needsInit && (dx | dz) != 0) {
                     // init neighbour
-                    neighbour.getEmptinessMap()[ExtendedChunk.getEmptinessMapIndex(-dx, -dz)] = new boolean[16];
+                    neighbourEmptinessMap[ExtendedChunk.getEmptinessMapIndex(-dx, -dz)] = new boolean[16];
 
-                    if (neighbour.getEmptinessMap()[ExtendedChunk.getEmptinessMapIndex(0, 0)] != null) {
+                    if (neighbourEmptinessMap[ExtendedChunk.getEmptinessMapIndex(0, 0)] != null) {
                         // init ourselves
                         System.arraycopy(
-                                neighbour.getEmptinessMap()[ExtendedChunk.getEmptinessMapIndex(0, 0)],
+                                neighbourEmptinessMap[ExtendedChunk.getEmptinessMapIndex(0, 0)],
                                 0,
                                 chunkEmptinessMap[ExtendedChunk.getEmptinessMapIndex(dx, dz)] = new boolean[16],
                                 0,
-                                9
+                                16
                         );
                     }
                 }
@@ -161,7 +161,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
                     }
 
                     // update neighbour map
-                    neighbour.getEmptinessMap()[ExtendedChunk.getEmptinessMapIndex(-dx, -dz)][sectionY] = empty;
+                    this.getEmptinessMap(dx + chunkX, dz + chunkZ)[ExtendedChunk.getEmptinessMapIndex(-dx, -dz)][sectionY] = empty;
                 }
             }
         }
@@ -176,11 +176,11 @@ public final class SkyStarLightEngine extends StarLightEngine {
             final int neighbourX = (i % 3) - 1 + chunkX;
             final int neighbourZ = (i / 3) - 1 + chunkZ;
 
-            final boolean[][] neighbourEmptinessMap = ((ExtendedChunk)this.getChunkInCache(neighbourX, neighbourZ)).getEmptinessMap();
+            final boolean[][] neighbourEmptinessMap = this.getEmptinessMap(neighbourX, neighbourZ);
 
             for (int sectionY = 16; sectionY >= -1; --sectionY) {
                 final SWMRNibbleArray nibble = this.getNibbleFromCache(neighbourX, sectionY, neighbourZ);
-                if (nibble.isNullNibbleUpdating()) {
+                if (nibble == null || nibble.isNullNibbleUpdating()) {
                     // already null
                     continue;
                 }
@@ -234,8 +234,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             return;
         }
 
-        final boolean[] emptinessMap = ((ExtendedChunk)this.getChunkInCache(chunkX, chunkZ))
-                .getEmptinessMap()[ExtendedChunk.getEmptinessMapIndex(0, 0)];
+        final boolean[] emptinessMap = this.getEmptinessMap(chunkX, chunkZ)[ExtendedChunk.getEmptinessMapIndex(0, 0)];
 
         // are we above this chunk's lowest empty section?
         int lowestY = -2;
@@ -284,6 +283,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             if (nibble != null && nibble.isNullNibbleUpdating()) {
                 // stop propagation in these areas
                 this.nibbleCache[index] = null;
+                nibble.updateVisible();
             }
         }
     }
@@ -359,6 +359,11 @@ public final class SkyStarLightEngine extends StarLightEngine {
     @Override
     protected SWMRNibbleArray[] getNibblesOnChunk(final Chunk chunk) {
         return ((ExtendedChunk)chunk).getSkyNibbles();
+    }
+
+    @Override
+    protected boolean[][] getEmptinessMap(final Chunk chunk) {
+        return ((ExtendedChunk)chunk).getEmptinessMap();
     }
 
     @Override
@@ -472,7 +477,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
                 // ensure section is checked
                 this.checkNullSection(columnX >> 4, maxPropagationY >> 4, columnZ >> 4, true);
 
-                for (int currY = maxPropagationY; currY >= -15; --currY) {
+                for (int currY = maxPropagationY; currY >= (-1 << 4); --currY) {
                     if ((currY & 15) == 15) {
                         // ensure section is checked
                         this.checkNullSection(columnX >> 4, (currY >> 4), columnZ >> 4, true);
@@ -611,7 +616,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             final int maxZ = worldChunkZ + 16;
             for (int currZ = minZ; currZ <= maxZ; ++currZ) {
                 for (int currX = minX; currX <= maxX; ++currX) {
-                    int maxY = -33;
+                    int maxY = ((-1 -1) << 4);
 
                     // ensure the section below is always checked
                     this.checkNullSection(currX >> 4, highestNonEmptySection, currZ >> 4, false);
@@ -725,12 +730,12 @@ public final class SkyStarLightEngine extends StarLightEngine {
             // not required to propagate here, but this will reduce the hit of the edge checks
             this.performLightIncrease(lightAccess);
 
-            for (int y = -1; y <= 16; ++y) {
+            for (int y = 16; y >= -1; --y) {
                 this.checkNullSection(chunkX, y, chunkZ, false);
             }
             this.checkChunkEdges(lightAccess, chunk, -1, 16);
         } else {
-            for (int y = -1; y <= highestNonEmptySection; ++y) {
+            for (int y = highestNonEmptySection; y >= -1; --y) {
                 this.checkNullSection(chunkX, y, chunkZ, false);
             }
             this.propagateNeighbourLevels(lightAccess, chunk, -1, highestNonEmptySection);
@@ -797,7 +802,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             above = AIR_BLOCK_STATE;
         }
 
-        for (;startY >= -15; --startY) {
+        for (;startY >= (-1 << 4); --startY) {
             if ((startY & 15) == 15) {
                 // ensure this section is always checked
                 this.checkNullSection(worldX >> 4, startY >> 4, worldZ >> 4, extrudeInitialised);
