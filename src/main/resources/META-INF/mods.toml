@@ -1,0 +1,19 @@
+modLoader = "javafml"
+loaderVersion = "[35,)"
+license = "LGPL-3.0-only"
+
+[[mods]]
+ modId = "starlight"
+ version = "0.0.2-RC3"
+ displayName = "Starlight"
+ authors = "Spottedleaf"
+ description = '''
+    Rewrites the light engine to fix lighting performance and lighting errors
+ '''
+
+ [[dependencies.starlight]]
+  modId = "forge"
+  mandatory = true
+  versionRange = "[35,)"
+  ordering = "NONE"
+  side = "BOTH"

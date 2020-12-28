@@ -1,0 +1,1 @@
+MixinConnector: ca.spottedleaf.starlight.mixin.MixinConnector
