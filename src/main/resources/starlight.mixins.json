@@ -18,7 +18,7 @@
     "common.world.WorldMixin"
   ],
   "client": [
-    "client.world.ClientWorldMixin",
+    "client.world.ClientWorldMixin"
   ],
   "injectors": {
     "defaultRequire": 1
