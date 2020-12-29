@@ -22,5 +22,6 @@
   ],
   "injectors": {
     "defaultRequire": 1
-  }
+  },
+  "refmap": "starlight.refmap.json"
 }
