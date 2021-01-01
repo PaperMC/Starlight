@@ -392,7 +392,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
     }
 
     @Override
-    protected void checkBlock(final int worldX, final int worldY, final int worldZ) {
+    protected void checkBlock(final IChunkLightProvider lightAccess, final int worldX, final int worldY, final int worldZ) {
         // blocks can change opacity
         // blocks can change direction of propagation
 
@@ -513,7 +513,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
         this.processDelayedDecreases();
 
         for (final BlockPos pos : positions) {
-            this.checkBlock(pos.getX(), pos.getY(), pos.getZ());
+            this.checkBlock(lightAccess, pos.getX(), pos.getY(), pos.getZ());
         }
 
         this.performLightDecrease(lightAccess);
