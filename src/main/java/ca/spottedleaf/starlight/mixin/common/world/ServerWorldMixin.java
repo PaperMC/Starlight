@@ -1,5 +1,6 @@
 package ca.spottedleaf.starlight.mixin.common.world;
 
+import ca.spottedleaf.starlight.common.light.VariableBlockLightHandler;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import com.mojang.datafixers.util.Either;
@@ -19,6 +20,7 @@ import net.minecraft.world.dimension.DimensionType;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import java.util.function.Supplier;
 
 @Mixin(ServerWorld.class)
@@ -28,9 +30,22 @@ public abstract class ServerWorldMixin extends World implements StructureWorldAc
     @Shadow
     private ServerChunkManager serverChunkManager;
 
+    @Unique
+    private VariableBlockLightHandler customBlockLightHandler;
+
     protected ServerWorldMixin(final MutableWorldProperties properties, final RegistryKey<World> registryRef, final DimensionType dimensionType,
                                final Supplier<Profiler> profiler, final boolean isClient, final boolean debugWorld, final long seed) {
         super(properties, registryRef, dimensionType, profiler, isClient, debugWorld, seed);
+    }
+
+    @Override
+    public final VariableBlockLightHandler getCustomLightHandler() {
+        return this.customBlockLightHandler;
+    }
+
+    @Override
+    public final void setCustomLightHandler(final VariableBlockLightHandler handler) {
+        this.customBlockLightHandler = handler;
     }
 
     @Override

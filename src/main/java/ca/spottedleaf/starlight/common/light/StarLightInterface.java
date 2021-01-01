@@ -9,6 +9,7 @@ import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import net.minecraft.server.world.ChunkTicketType;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -20,6 +21,7 @@ import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.function.Consumer;
 
 public final class StarLightInterface {
 
@@ -341,6 +343,23 @@ public final class StarLightInterface {
             }
             if (blockEngine != null) {
                 blockEngine.relight(this.lightAccess, chunkX, chunkZ);
+            }
+        } finally {
+            this.releaseSkyLightEngine(skyEngine);
+            this.releaseBlockLightEngine(blockEngine);
+        }
+    }
+
+    public void relightChunks(final Set<ChunkPos> chunks, final Consumer<ChunkPos> chunkLightCallback) {
+        final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
+        final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
+
+        try {
+            if (skyEngine != null) {
+                skyEngine.relightChunks(this.lightAccess, chunks, chunkLightCallback);
+            }
+            if (blockEngine != null) {
+                blockEngine.relightChunks(this.lightAccess, chunks, chunkLightCallback);
             }
         } finally {
             this.releaseSkyLightEngine(skyEngine);
