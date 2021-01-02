@@ -41,7 +41,7 @@ public abstract class ChunkSerializerMixin {
         final int minSection = WorldUtil.getMinLightSection(world);
         final int maxSection = WorldUtil.getMaxLightSection(world);
         CompoundNBT ret = cir.getReturnValue();
-        if (ret == null || ((ExtendedWorld)world).getAnyChunkImmediately(chunk.getPos().x, chunk.getPos().z) != null) {
+        if (ret == null) {
             return;
         }
 
