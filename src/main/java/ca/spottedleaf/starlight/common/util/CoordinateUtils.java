@@ -8,6 +8,12 @@ import net.minecraft.util.math.SectionPos;
 
 public final class CoordinateUtils {
 
+    // dx, dz are relative to the target chunk
+    // dx, dz in [-radius, radius]
+    public static int getNeighbourMappedIndex(final int dx, final int dz, final int radius) {
+        return (dx + radius) + (2 * radius + 1)*(dz + radius);
+    }
+
     // the chunk keys are compatible with vanilla
 
     public static long getChunkKey(final BlockPos pos) {

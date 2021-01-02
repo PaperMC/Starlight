@@ -6,6 +6,7 @@ import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.light.StarLightInterface;
 import ca.spottedleaf.starlight.common.light.StarLightLightingProvider;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
+import ca.spottedleaf.starlight.common.util.WorldUtil;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortOpenHashSet;
@@ -196,7 +197,7 @@ public abstract class WorldLightManagerMixin implements ILightListener, StarLigh
         switch (lightType) {
             case BLOCK: {
                 final SWMRNibbleArray[] blockNibbles = this.blockLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
-                    return StarLightEngine.getFilledEmptyLight();
+                    return StarLightEngine.getFilledEmptyLight(this.lightEngine.getWorld());
                 });
 
                 final SWMRNibbleArray replacement;
@@ -208,7 +209,7 @@ public abstract class WorldLightManagerMixin implements ILightListener, StarLigh
                     replacement = new SWMRNibbleArray(nibble.getData().clone()); // make sure we don't write to the parameter later
                 }
 
-                blockNibbles[pos.getY() + 1] = replacement;
+                blockNibbles[pos.getY() - WorldUtil.getMinLightSection(this.lightEngine.getWorld())] = replacement;
 
                 if (chunk != null) {
                     ((ExtendedChunk)chunk).setBlockNibbles(blockNibbles);
@@ -218,7 +219,7 @@ public abstract class WorldLightManagerMixin implements ILightListener, StarLigh
             }
             case SKY: {
                 final SWMRNibbleArray[] skyNibbles = this.skyLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
-                    return StarLightEngine.getFilledEmptyLight();
+                    return StarLightEngine.getFilledEmptyLight(this.lightEngine.getWorld());
                 });
 
                 final SWMRNibbleArray replacement;
@@ -230,7 +231,7 @@ public abstract class WorldLightManagerMixin implements ILightListener, StarLigh
                     replacement = new SWMRNibbleArray(nibble.getData().clone()); // make sure we don't write to the parameter later
                 }
 
-                skyNibbles[pos.getY() + 1] = replacement;
+                skyNibbles[pos.getY() - WorldUtil.getMinLightSection(this.lightEngine.getWorld())] = replacement;
 
                 if (chunk != null) {
                     ((ExtendedChunk)chunk).setSkyNibbles(skyNibbles);

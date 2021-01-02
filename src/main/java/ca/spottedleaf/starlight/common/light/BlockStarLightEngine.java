@@ -6,6 +6,7 @@ import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import net.minecraft.block.BlockState;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.palette.PalettedContainer;
+import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkPrimerWrapper;
 import net.minecraft.world.chunk.ChunkSection;
@@ -20,9 +21,17 @@ import java.util.Set;
 
 public final class BlockStarLightEngine extends StarLightEngine {
 
-    public BlockStarLightEngine(final boolean isClientSide) {
-        super(false, isClientSide);
+    public BlockStarLightEngine(final World world) {
+        super(false, world);
     }
+
+    @Override
+    protected boolean[] getEmptinessMap(final IChunk chunk) {
+        return null;
+    }
+
+    @Override
+    protected void setEmptinessMap(final IChunk chunk, final boolean[] to) {}
 
     @Override
     protected SWMRNibbleArray[] getNibblesOnChunk(final IChunk chunk) {
@@ -40,13 +49,10 @@ public final class BlockStarLightEngine extends StarLightEngine {
     }
 
     @Override
-    protected boolean[][] getEmptinessMap(final IChunk chunk) {
+    protected boolean[] handleEmptySectionChanges(final IChunkLightProvider lightAccess, final IChunk chunk,
+                                                  final Boolean[] emptinessChanges, final boolean unlit) {
         return null;
     }
-
-    @Override
-    protected void handleEmptySectionChanges(final IChunkLightProvider lightAccess, final IChunk chunk,
-                                             final Boolean[] emptinessChanges, final boolean unlit) {}
 
     @Override
     protected final void checkBlock(final IChunkLightProvider lightAccess, final int worldX, final int worldY, final int worldZ) {
@@ -171,9 +177,9 @@ public final class BlockStarLightEngine extends StarLightEngine {
             this.performLightIncrease(lightAccess);
 
             // verify neighbour edges
-            this.checkChunkEdges(lightAccess, chunk, -1, 16);
+            this.checkChunkEdges(lightAccess, chunk, this.minLightSection, this.maxLightSection);
         } else {
-            this.propagateNeighbourLevels(lightAccess, chunk, -1, 16);
+            this.propagateNeighbourLevels(lightAccess, chunk, this.minLightSection, this.maxLightSection);
 
             this.performLightIncrease(lightAccess);
         }

@@ -27,7 +27,7 @@ public abstract class ChunkPrimerMixin implements IChunk, ExtendedChunk {
     private volatile SWMRNibbleArray[] skyNibbles;
 
     @Unique
-    private boolean[][] emptinessMap;
+    private volatile boolean[] emptinessMap;
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {
@@ -50,8 +50,13 @@ public abstract class ChunkPrimerMixin implements IChunk, ExtendedChunk {
     }
 
     @Override
-    public boolean[][] getEmptinessMap() {
+    public boolean[] getEmptinessMap() {
         return this.emptinessMap;
+    }
+
+    @Override
+    public void setEmptinessMap(final boolean[] emptinessMap) {
+        this.emptinessMap = emptinessMap;
     }
 
     /**
@@ -67,6 +72,5 @@ public abstract class ChunkPrimerMixin implements IChunk, ExtendedChunk {
                             final CallbackInfo ci) {
         this.blockNibbles = StarLightEngine.getFilledEmptyLight();
         this.skyNibbles = StarLightEngine.getFilledEmptyLight();
-        this.emptinessMap = new boolean[9][];
     }
 }

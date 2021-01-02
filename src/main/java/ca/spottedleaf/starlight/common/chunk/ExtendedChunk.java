@@ -10,10 +10,6 @@ public interface ExtendedChunk {
     public SWMRNibbleArray[] getSkyNibbles();
     public void setSkyNibbles(final SWMRNibbleArray[] nibbles);
 
-    // cx, cz are relative to the target chunk's map
-    public static int getEmptinessMapIndex(final int cx, final int cz) {
-        //return (cx + 1) + 3*(cz + 1);
-        return (1 + 3 * 1) + (cx) + 3*(cz);
-    }
-    public boolean[][] getEmptinessMap();
+    public boolean[] getEmptinessMap();
+    public void setEmptinessMap(final boolean[] emptinessMap);
 }
