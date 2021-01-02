@@ -404,19 +404,21 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
         if (currentLevel == 15) {
             // must re-propagate clobbered source
-            this.increaseQueue[this.increaseQueueInitialLength++] =
+            this.appendToIncreaseQueue(
                     ((worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                             | (currentLevel & 0xFL) << (6 + 6 + 16)
                             | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4))
-                            | FLAG_HAS_SIDED_TRANSPARENT_BLOCKS; // don't know if the block is conditionally transparent
+                            | FLAG_HAS_SIDED_TRANSPARENT_BLOCKS // don't know if the block is conditionally transparent
+            );
         } else {
             this.setLightLevel(worldX, worldY, worldZ, 0);
         }
 
-        this.decreaseQueue[this.decreaseQueueInitialLength++] =
+        this.appendToDecreaseQueue(
                 ((worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                         | (currentLevel & 0xFL) << (6 + 6 + 16)
-                        | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4));
+                        | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4))
+        );
     }
 
     protected final int[] heightMapBlockChange = new int[16 * 16];
@@ -498,11 +500,12 @@ public final class SkyStarLightEngine extends StarLightEngine {
                     }
 
                     // delay light set until after processing all sources to setup
-                    this.decreaseQueue[this.decreaseQueueInitialLength++] =
+                    this.appendToDecreaseQueue(
                             ((columnX + (columnZ << 6) + (currY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                     | (15L << (6 + 6 + 16))
-                                    | (propagateDirection << (6 + 6 + 16 + 4));
+                                    | (propagateDirection << (6 + 6 + 16 + 4))
                                     // do not set transparent blocks for the same reason we don't in the checkBlock method
+                    );
                 }
             }
         }
@@ -588,11 +591,12 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
                 for (int currY = highestNonEmptySection << 4, maxY = currY | 15; currY <= maxY; ++currY) {
                     for (int i = 0, currX = startX, currZ = startZ; i < 16; ++i, currX += incX, currZ += incZ) {
-                        this.increaseQueue[this.increaseQueueInitialLength++] =
+                        this.appendToIncreaseQueue(
                                 ((currX + (currZ << 6) + (currY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                         | (15L << (6 + 6 + 16)) // we know we're at full lit here
-                                        | (propagateDirection << (6 + 6 + 16 + 4));
+                                        | (propagateDirection << (6 + 6 + 16 + 4))
                                         // no transparent flag, we know for a fact there are no blocks here that could be directionally transparent (as the section is EMPTY)
+                        );
                     }
                 }
             }
@@ -647,7 +651,6 @@ public final class SkyStarLightEngine extends StarLightEngine {
             }
 
             // now setup sources
-            final long[] queue = this.increaseQueue;
             final int encodeOffset = this.coordinateOffset;
             for (int currZ = 0; currZ <= 15; ++currZ) {
                 for (int currX = 0; currX <= 15; ++currX) {
@@ -675,8 +678,6 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
                     // Z = 1
                     final int heightMapPZ = heightMap[(currX + 1) | ((currZ + 1 + 1) << 5)];
-
-                    int queueLength = this.increaseQueueInitialLength;
 
                     for (int currY = (highestNonEmptySection << 4) + 16; currY > heightMapC;) {
                         final SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, currY >> 4, chunkZ);
@@ -709,17 +710,17 @@ public final class SkyStarLightEngine extends StarLightEngine {
                         // when initialising
                         nibble.set((worldX & 15) | ((worldZ & 15) << 4) | ((currY & 15) << 8), 15);
                         if (propagateDirectionBitset != 0L) {
-                            queue[queueLength++] =
+                            this.appendToIncreaseQueue(
                                     ((worldX + (worldZ << 6) + (currY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | (15L << (6 + 6 + 16))
-                                            | propagateDirectionBitset << (6 + 6 + 16 + 4);
+                                            | propagateDirectionBitset << (6 + 6 + 16 + 4)
                                             // above heightmap, so not sidedly transparent
+                            );
                         }
 
                         --currY;
                     }
 
-                    this.increaseQueueInitialLength = queueLength;
                     // Just in case there's a conditionally transparent block at the top.
                     this.tryPropagateSkylight(world, worldX, heightMapC, worldZ, false, false);
                 }
@@ -834,10 +835,11 @@ public final class SkyStarLightEngine extends StarLightEngine {
                 // most of the time it falls here.
                 // add to propagate
                 // light set delayed until we determine if this nibble section is null
-                this.increaseQueue[this.increaseQueueInitialLength++] =
+                this.appendToIncreaseQueue(
                         ((worldX + (worldZ << 6) + (startY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                 | (15L << (6 + 6 + 16)) // we know we're at full lit here
-                                | (propagateDirection << (6 + 6 + 16 + 4));
+                                | (propagateDirection << (6 + 6 + 16 + 4))
+                );
             } else {
                 mutablePos.setPos(worldX, startY, worldZ);
                 long flags = 0L;
@@ -858,11 +860,12 @@ public final class SkyStarLightEngine extends StarLightEngine {
                 }
 
                 // light set delayed until we determine if this nibble section is null
-                this.increaseQueue[this.increaseQueueInitialLength++] =
+                this.appendToIncreaseQueue(
                         ((worldX + (worldZ << 6) + (startY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                 | (15L << (6 + 6 + 16)) // we know we're at full lit here
                                 | (propagateDirection << (6 + 6 + 16 + 4))
-                                | flags;
+                                | flags
+                );
             }
 
             above = current;
