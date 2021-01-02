@@ -642,7 +642,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
                         }
 
                         final int highestBitSet = 63 ^ Long.numberOfLeadingZeros(bitset); // from [0, 63]
-                        final int highestYValue = highestBitSet >> 1;
+                        final int highestYValue = highestBitSet; // y = highest bit set / bits per block
                         maxY = highestYValue | (sectionY << 4);
                         break;
                     }
