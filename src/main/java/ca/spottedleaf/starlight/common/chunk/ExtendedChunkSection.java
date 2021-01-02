@@ -3,8 +3,7 @@ package ca.spottedleaf.starlight.common.chunk;
 public interface ExtendedChunkSection {
 
     public static final long BLOCK_IS_TRANSPARENT = 0b00;
-    public static final long BLOCK_IS_FULL_OPAQUE = 0b01;
-    public static final long BLOCK_UNKNOWN_TRANSPARENCY = 0b10;
+    public static final long BLOCK_UNKNOWN_TRANSPARENCY = 0b01;
     // 0b11 is unused
 
     public boolean hasOpaqueBlocks();
