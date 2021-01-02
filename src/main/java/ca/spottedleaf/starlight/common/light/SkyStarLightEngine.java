@@ -3,6 +3,7 @@ package ca.spottedleaf.starlight.common.light;
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
+import ca.spottedleaf.starlight.common.util.WorldUtil;
 import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import net.minecraft.block.BlockState;
 import net.minecraft.util.math.BlockPos;
@@ -10,6 +11,7 @@ import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkProvider;
 import net.minecraft.world.chunk.ChunkSection;
@@ -43,178 +45,130 @@ public final class SkyStarLightEngine extends StarLightEngine {
       around those.
      */
 
+    protected final int[] heightMapBlockChange = new int[16 * 16];
+    {
+        Arrays.fill(this.heightMapBlockChange, Integer.MIN_VALUE); // clear heightmap
+    }
+
+    protected final boolean[] nullPropagationCheckCache;
+
+    public SkyStarLightEngine(final World world) {
+        super(true, world);
+        this.nullPropagationCheckCache = new boolean[WorldUtil.getTotalLightSections(world)];
+    }
+
     @Override
-    protected void handleEmptySectionChanges(final ChunkProvider lightAccess, final Chunk chunk,
-                                             final Boolean[] emptinessChanges, final boolean unlit) {
+    protected boolean[] handleEmptySectionChanges(final ChunkProvider lightAccess, final Chunk chunk,
+                                                  final Boolean[] emptinessChanges, final boolean unlit) {
+        final World world = (World)lightAccess.getWorld();
         final int chunkX = chunk.getPos().x;
         final int chunkZ = chunk.getPos().z;
 
-        final boolean[][] chunkEmptinessMap = this.getEmptinessMap(chunkX, chunkZ);
-
-        // index = (cx + 2) + 5*(cz + 2)
-        long loadedNeighboursBitset = 0L;
-        long unloadedNeighbourBitset = 0L;
-
-        for (int dz = -1; dz <= 1; ++dz) {
-            for (int dx = -1; dx <= 1; ++dx) {
-                final Chunk neighbour = this.getChunkInCache(dx + chunkX, dz + chunkZ);
-                if (neighbour == null) {
-                    continue;
-                }
-
-                final boolean[][] neighbourEmptinessMap = this.getEmptinessMap(dx + chunkX, dz + chunkZ);
-                for (int i = 0; i < neighbourEmptinessMap.length; ++i) {
-                    // index = (cx + 1) + 3*(cz + 1)
-                    final int dx2 = (i % 3) - 1;
-                    final int dz2 = (i / 3) - 1;
-
-                    final int bitsetIndex = (dx2 + dx + 2) + 5*(dz2 + dz + 2);
-                    if (neighbourEmptinessMap[i] == null) {
-                        unloadedNeighbourBitset |= 1L << bitsetIndex;
-                    } else {
-                        loadedNeighboursBitset |= 1L << bitsetIndex;
-                    }
-                }
-            }
-        }
-
-        loadedNeighboursBitset &= ~unloadedNeighbourBitset;
-        loadedNeighboursBitset |=  1L << ((0 + 2) + 5*(0 + 2));
-
-        final boolean[] needsDeInitCheck = new boolean[9];
-        final boolean needsInit = unlit || chunkEmptinessMap[ExtendedChunk.getEmptinessMapIndex(0, 0)] == null;
+        boolean[] chunkEmptinessMap = this.getEmptinessMap(chunkX, chunkZ);
+        boolean[] ret = null;
+        final boolean needsInit = unlit || chunkEmptinessMap == null;
         if (needsInit) {
-            chunkEmptinessMap[ExtendedChunk.getEmptinessMapIndex(0, 0)] = new boolean[16];;
+            this.setEmptinessMapCache(chunkX, chunkZ, ret = chunkEmptinessMap = new boolean[WorldUtil.getTotalSections(world)]);
         }
 
-        // this chunk is new, so we need to init neighbours
-        // because this chunk might have been modified inbetween loading/saving, we have to rewrite the emptiness map
-        // for our neighbours, so don't bother checking if they exist & whether they even needed a de-init recalc
-        for (int dz = -1; dz <= 1; ++dz) {
-            for (int dx = -1; dx <= 1; ++dx) {
-                final ExtendedChunk neighbour = ((ExtendedChunk)this.getChunkInCache(dx + chunkX, dz + chunkZ));
-                if (neighbour == null) {
-                    // if the neighbour hasn't initialised its own empty map, we can't use it
-                    // when it does though, it'll come by and initialise our map for it
-                    continue;
+        // update emptiness map
+        for (int sectionIndex = (emptinessChanges.length - 1); sectionIndex >= 0; --sectionIndex) {
+            final Boolean valueBoxed = emptinessChanges[sectionIndex];
+            if (valueBoxed == null) {
+                if (needsInit) {
+                    throw new IllegalStateException("Current chunk has not initialised emptiness map yet supplied emptiness map isn't filled?");
                 }
-                final boolean[][] neighbourEmptinessMap = this.getEmptinessMap(dx + chunkX, dz + chunkZ);
-
-                if (needsInit && (dx | dz) != 0) {
-                    // init neighbour
-                    neighbourEmptinessMap[ExtendedChunk.getEmptinessMapIndex(-dx, -dz)] = new boolean[16];
-
-                    if (neighbourEmptinessMap[ExtendedChunk.getEmptinessMapIndex(0, 0)] != null) {
-                        // init ourselves
-                        System.arraycopy(
-                                neighbourEmptinessMap[ExtendedChunk.getEmptinessMapIndex(0, 0)],
-                                0,
-                                chunkEmptinessMap[ExtendedChunk.getEmptinessMapIndex(dx, dz)] = new boolean[16],
-                                0,
-                                16
-                        );
-                    }
-                }
-
-                // check if our neighbours are ready for a recalc
-
-                long neighboursMask = 0L;
-                for (int dz2 = -1; dz2 <= 1; ++dz2) {
-                    for (int dx2 = -1; dx2 <= 1; ++dx2) {
-                        neighboursMask |= 1L << ((dx2 + dx + 2) + 5*(dz2 + dz + 2));
-                    }
-                }
-
-                if ((loadedNeighboursBitset & neighboursMask) == neighboursMask) {
-                    // can check for de-init
-                    needsDeInitCheck[(dx + 1) + 3 * (dz + 1)] = true;
-                }
+                continue;
             }
+            chunkEmptinessMap[sectionIndex] = valueBoxed.booleanValue();
         }
 
-        for (int sectionY = (emptinessChanges.length - 1); sectionY >= 0; --sectionY) {
-            final Boolean valueBoxed = emptinessChanges[sectionY];
+        // now init neighbour nibbles
+        for (int sectionIndex = (emptinessChanges.length - 1); sectionIndex >= 0; --sectionIndex) {
+            final Boolean valueBoxed = emptinessChanges[sectionIndex];
+            final int sectionY = sectionIndex + this.minSection;
             if (valueBoxed == null) {
                 continue;
             }
 
             final boolean empty = valueBoxed.booleanValue();
 
-            for (int dz = -1; dz <= 1; ++dz) {
-                for (int dx = -1; dx <= 1; ++dx) {
-                    final ExtendedChunk neighbour = (ExtendedChunk)this.getChunkInCache(dx + chunkX, dz + chunkZ);
-                    if (neighbour == null) {
-                        // this is the case on the client, we _assume_ the server inits and sends to us.
-                        // or we're on the server, and the neighbours haven't generated light yet.
-                        continue;
-                    }
-
-                    // init nibbles as needed
-
-                    if (!empty) {
-                        // if we're not empty, we also need to initialise nibbles
-                        // note: if we're unlit, we absolutely do not want to extrude, as light data isn't set up
-                        final boolean extrude = (dx | dz) != 0 || !unlit;
-                        for (int dy = 1; dy >= -1; --dy) {
-                            this.initNibbleForLitChunk(dx + chunkX, dy + sectionY, dz + chunkZ, extrude, false);
-                        }
-                    }
-
-                    // update neighbour map
-                    this.getEmptinessMap(dx + chunkX, dz + chunkZ)[ExtendedChunk.getEmptinessMapIndex(-dx, -dz)][sectionY] = empty;
-                }
-            }
-        }
-
-        // check for de-init, only runs if this just had data loaded in (or is being lit)
-        for (int i = 0; i < needsDeInitCheck.length; ++i) {
-            if (!needsDeInitCheck[i]) {
+            if (empty) {
                 continue;
             }
 
-            // index = (cx + 1) + 3*(cz + 1)
-            final int neighbourX = (i % 3) - 1 + chunkX;
-            final int neighbourZ = (i / 3) - 1 + chunkZ;
-
-            final boolean[][] neighbourEmptinessMap = this.getEmptinessMap(neighbourX, neighbourZ);
-
-            for (int sectionY = 16; sectionY >= -1; --sectionY) {
-                final SWMRNibbleArray nibble = this.getNibbleFromCache(neighbourX, sectionY, neighbourZ);
-                if (nibble == null || nibble.isNullNibbleUpdating()) {
-                    // already null
-                    continue;
-                }
-
-                // check neighbours to see if we need to de-init this one
-                boolean allEmpty = true;
-                neighbour_search:
-                for (int dy = -1; dy <= 1; ++dy) {
-                    for (int dz = -1; dz <= 1; ++dz) {
-                        for (int dx = -1; dx <= 1; ++dx) {
-                            final int y = sectionY + dy;
-                            if (y < 0 || y > 15) {
-                                // empty
-                                continue;
-                            }
-                            if (!neighbourEmptinessMap[ExtendedChunk.getEmptinessMapIndex(dx, dz)][y]) {
-                                allEmpty = false;
-                                break neighbour_search;
-                            }
-                        }
+            for (int dz = -1; dz <= 1; ++dz) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    // if we're not empty, we also need to initialise nibbles
+                    // note: if we're unlit, we absolutely do not want to extrude, as light data isn't set up
+                    final boolean extrude = (dx | dz) != 0 || !unlit;
+                    for (int dy = 1; dy >= -1; --dy) {
+                        this.initNibbleForLitChunk(dx + chunkX, dy + sectionY, dz + chunkZ, extrude, false);
                     }
-                }
-
-                if (allEmpty) {
-                    // all were empty, so de-init
-                    nibble.setNull();
                 }
             }
         }
+
+        // check for de-init
+        for (int dz = -1; dz <= 1; ++dz) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                // does this neighbour have 1 radius loaded?
+                boolean neighboursLoaded = true;
+                neighbour_loaded_search:
+                for (int dz2 = -1; dz2 <= 1; ++dz2) {
+                    for (int dx2 = -1; dx2 <= 1; ++dx2) {
+                        if (this.getEmptinessMap(dx + dx2 + chunkX, dz + dz2 + chunkZ) == null) {
+                            neighboursLoaded = false;
+                            break neighbour_loaded_search;
+                        }
+                    }
+                }
+                if (!neighboursLoaded) {
+                    // no we don't, so we can check.
+                    continue;
+                }
+
+                // yes we do, so we can check.
+                for (int sectionY = this.maxLightSection; sectionY >= this.minLightSection; --sectionY) {
+                    final SWMRNibbleArray nibble = this.getNibbleFromCache(dx + chunkX, sectionY, dz + chunkZ);
+                    if (nibble == null || nibble.isNullNibbleUpdating()) {
+                        // already null
+                        continue;
+                    }
+
+                    // check neighbours to see if we need to de-init this one
+                    boolean allEmpty = true;
+                    neighbour_search:
+                    for (int dy2 = -1; dy2 <= 1; ++dy2) {
+                        for (int dz2 = -1; dz2 <= 1; ++dz2) {
+                            for (int dx2 = -1; dx2 <= 1; ++dx2) {
+                                final int y = sectionY + dy2;
+                                if (y < this.minSection || y > this.maxSection) {
+                                    // empty
+                                    continue;
+                                }
+                                if (!this.getEmptinessMap(dx + dx2 + chunkX, dz + dz2 + chunkZ)[y - this.minSection]) {
+                                    allEmpty = false;
+                                    break neighbour_search;
+                                }
+                            }
+                        }
+                    }
+
+                    if (allEmpty) {
+                        // all were empty, so de-init
+                        nibble.setNull();
+                    }
+                }
+            }
+        }
+
+        return ret;
     }
 
     protected final void initNibbleForLitChunk(final int chunkX, final int chunkY, final int chunkZ, final boolean extrude,
                                                final boolean initRemovedNibbles) {
-        if (chunkY < -1 || chunkY > 16 || this.getChunkInCache(chunkX, chunkZ) == null) {
+        if (chunkY < this.minLightSection || chunkY > this.maxLightSection || this.getChunkInCache(chunkX, chunkZ) == null) {
             return;
         }
         SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, chunkY, chunkZ);
@@ -234,11 +188,11 @@ public final class SkyStarLightEngine extends StarLightEngine {
             return;
         }
 
-        final boolean[] emptinessMap = this.getEmptinessMap(chunkX, chunkZ)[ExtendedChunk.getEmptinessMapIndex(0, 0)];
+        final boolean[] emptinessMap = this.getEmptinessMap(chunkX, chunkZ);
 
         // are we above this chunk's lowest empty section?
-        int lowestY = -2;
-        for (int currY = 15; currY >= 0; --currY) {
+        int lowestY = this.minLightSection - 1;
+        for (int currY = this.maxSection; currY >= this.minSection; --currY) {
             if (emptinessMap == null) {
                 // cannot delay nibble init for lit chunks, as we need to init to propagate into them.
                 final ChunkSection current = this.getChunkSection(chunkX, currY, chunkZ);
@@ -246,7 +200,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
                     continue;
                 }
             } else {
-                if (emptinessMap[currY]) {
+                if (emptinessMap[currY - this.minSection]) {
                     continue;
                 }
             }
@@ -265,7 +219,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
         if (extrude) {
             // this nibble is going to depend solely on the skylight data above it
             // find first non-null data above (there does exist one, as we just found it above)
-            for (int currY = chunkY + 1; currY <= 16; ++currY) {
+            for (int currY = chunkY + 1; currY <= this.maxLightSection; ++currY) {
                 final SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, currY, chunkZ);
                 if (nibble != null && !nibble.isNullNibbleUpdating()) {
                     currNibble.extrudeLower(nibble);
@@ -288,8 +242,6 @@ public final class SkyStarLightEngine extends StarLightEngine {
         }
     }
 
-    protected final boolean[] nullPropagationCheckCache = new boolean[16 - (-1) + 1];
-
     // rets whether neighbours were init'd
 
     protected final boolean checkNullSection(final int chunkX, final int chunkY, final int chunkZ,
@@ -300,10 +252,10 @@ public final class SkyStarLightEngine extends StarLightEngine {
         // this nibble would be initialised). So, we don't have to initialise
         // the neighbours in the full 1 radius, because there's no worry that any "paths"
         // to the neighbours on this horizontal plane are blocked.
-        if (chunkY < -1 || chunkY > 16 || this.nullPropagationCheckCache[chunkY + 1]) {
+        if (chunkY < this.minLightSection || chunkY > this.maxLightSection || this.nullPropagationCheckCache[chunkY - this.minLightSection]) {
             return false;
         }
-        this.nullPropagationCheckCache[chunkY + 1] = true;
+        this.nullPropagationCheckCache[chunkY - this.minLightSection] = true;
 
         // check horizontal neighbours
         boolean needInitNeighbours = false;
@@ -340,7 +292,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
         }
 
         for (;;) {
-            if (++chunkY > 16) {
+            if (++chunkY > this.maxLightSection) {
                 return 15;
             }
 
@@ -352,18 +304,19 @@ public final class SkyStarLightEngine extends StarLightEngine {
         }
     }
 
-    public SkyStarLightEngine(final boolean isClientSide) {
-        super(true, isClientSide);
+    @Override
+    protected boolean[] getEmptinessMap(final Chunk chunk) {
+        return ((ExtendedChunk)chunk).getEmptinessMap();
+    }
+
+    @Override
+    protected void setEmptinessMap(final Chunk chunk, final boolean[] to) {
+        ((ExtendedChunk)chunk).setEmptinessMap(to);
     }
 
     @Override
     protected SWMRNibbleArray[] getNibblesOnChunk(final Chunk chunk) {
         return ((ExtendedChunk)chunk).getSkyNibbles();
-    }
-
-    @Override
-    protected boolean[][] getEmptinessMap(final Chunk chunk) {
-        return ((ExtendedChunk)chunk).getEmptinessMap();
     }
 
     @Override
@@ -374,8 +327,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
     @Override
     protected boolean canUseChunk(final Chunk chunk) {
         // can only use chunks for sky stuff if their sections have been init'd
-        return chunk.getStatus().isAtLeast(ChunkStatus.LIGHT)
-                && (this.isClientSide ? ((ExtendedChunk)chunk).getEmptinessMap()[ExtendedChunk.getEmptinessMapIndex(0, 0)] != null : chunk.isLightOn());
+        return chunk.getStatus().isAtLeast(ChunkStatus.LIGHT) && (this.isClientSide ? true : chunk.isLightOn());
     }
 
     @Override
@@ -421,11 +373,6 @@ public final class SkyStarLightEngine extends StarLightEngine {
         );
     }
 
-    protected final int[] heightMapBlockChange = new int[16 * 16];
-    {
-        Arrays.fill(this.heightMapBlockChange, -1024); // clear heightmap
-    }
-
     @Override
     protected void propagateBlockChanges(final ChunkProvider lightAccess, final Chunk atChunk, final Set<BlockPos> positions) {
         this.rewriteNibbleCacheForSkylight(atChunk);
@@ -437,15 +384,11 @@ public final class SkyStarLightEngine extends StarLightEngine {
         final int heightMapOffset = chunkX * -16 + (chunkZ * (-16 * 16));
 
         // setup heightmap for changes
-        int highestBlockY = -1024;
         for (final BlockPos pos : positions) {
             final int index = pos.getX() + (pos.getZ() << 4) + heightMapOffset;
             final int curr = this.heightMapBlockChange[index];
             if (pos.getY() > curr) {
                 this.heightMapBlockChange[index] = pos.getY();
-            }
-            if (pos.getY() > highestBlockY) {
-                highestBlockY = pos.getY();
             }
         }
 
@@ -456,11 +399,11 @@ public final class SkyStarLightEngine extends StarLightEngine {
         // now we can recalculate the sources for the changed columns
         for (int index = 0; index < (16 * 16); ++index) {
             final int maxY = this.heightMapBlockChange[index];
-            if (maxY == -1024) {
+            if (maxY == Integer.MIN_VALUE) {
                 // not changed
                 continue;
             }
-            this.heightMapBlockChange[index] = -1024; // restore default for next caller
+            this.heightMapBlockChange[index] = Integer.MIN_VALUE; // restore default for next caller
 
             final int columnX = (index & 15) | (chunkX << 4);
             final int columnZ = (index >>> 4) | (chunkZ << 4);
@@ -479,7 +422,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
                 // ensure section is checked
                 this.checkNullSection(columnX >> 4, maxPropagationY >> 4, columnZ >> 4, true);
 
-                for (int currY = maxPropagationY; currY >= (-1 << 4); --currY) {
+                for (int currY = maxPropagationY; currY >= (this.minLightSection << 4); --currY) {
                     if ((currY & 15) == 15) {
                         // ensure section is checked
                         this.checkNullSection(columnX >> 4, (currY >> 4), columnZ >> 4, true);
@@ -536,9 +479,9 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
         final ChunkSection[] sections = chunk.getSectionArray();
 
-        int highestNonEmptySection = 15;
-        while (highestNonEmptySection == -1 ||
-                sections[highestNonEmptySection] == null || sections[highestNonEmptySection].isEmpty()) {
+        int highestNonEmptySection = this.maxSection;
+        while (highestNonEmptySection == (this.minSection - 1) ||
+                sections[highestNonEmptySection - this.minSection] == null || sections[highestNonEmptySection - this.minSection].isEmpty()) {
             this.checkNullSection(chunkX, highestNonEmptySection, chunkZ, false);
             // try propagate FULL to neighbours
 
@@ -601,12 +544,12 @@ public final class SkyStarLightEngine extends StarLightEngine {
                 }
             }
 
-            if (highestNonEmptySection-- == -1) {
+            if (highestNonEmptySection-- == (this.minSection - 1)) {
                 break;
             }
         }
 
-        if (highestNonEmptySection >= 0) {
+        if (highestNonEmptySection >= this.minSection) {
             // fill out our other sources
 
             // init heightmap
@@ -620,7 +563,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             final int maxZ = worldChunkZ + 16;
             for (int currZ = minZ; currZ <= maxZ; ++currZ) {
                 for (int currX = minX; currX <= maxX; ++currX) {
-                    int maxY = ((-1 -1) << 4);
+                    int maxY = ((this.minLightSection - 1) << 4);
 
                     // ensure the section below is always checked
                     this.checkNullSection(currX >> 4, highestNonEmptySection, currZ >> 4, false);
@@ -731,15 +674,15 @@ public final class SkyStarLightEngine extends StarLightEngine {
             // not required to propagate here, but this will reduce the hit of the edge checks
             this.performLightIncrease(lightAccess);
 
-            for (int y = 16; y >= -1; --y) {
+            for (int y = this.maxLightSection; y >= this.minLightSection; --y) {
                 this.checkNullSection(chunkX, y, chunkZ, false);
             }
-            this.checkChunkEdges(lightAccess, chunk, -1, 16);
+            this.checkChunkEdges(lightAccess, chunk, this.minLightSection, this.maxLightSection);
         } else {
-            for (int y = highestNonEmptySection; y >= -1; --y) {
+            for (int y = highestNonEmptySection; y >= this.minLightSection; --y) {
                 this.checkNullSection(chunkX, y, chunkZ, false);
             }
-            this.propagateNeighbourLevels(lightAccess, chunk, -1, highestNonEmptySection);
+            this.propagateNeighbourLevels(lightAccess, chunk, this.minLightSection, highestNonEmptySection);
 
             this.performLightIncrease(lightAccess);
         }
@@ -803,7 +746,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             above = AIR_BLOCK_STATE;
         }
 
-        for (;startY >= (-1 << 4); --startY) {
+        for (;startY >= (this.minLightSection << 4); --startY) {
             if ((startY & 15) == 15) {
                 // ensure this section is always checked
                 this.checkNullSection(worldX >> 4, startY >> 4, worldZ >> 4, extrudeInitialised);

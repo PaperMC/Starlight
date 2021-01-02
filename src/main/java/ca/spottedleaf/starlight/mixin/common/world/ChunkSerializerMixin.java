@@ -3,6 +3,7 @@ package ca.spottedleaf.starlight.mixin.common.world;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
+import ca.spottedleaf.starlight.common.util.WorldUtil;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -23,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ChunkSerializer.class)
 public abstract class ChunkSerializerMixin {
 
-    private static final int STARLIGHT_LIGHT_VERSION = 1;
+    private static final int STARLIGHT_LIGHT_VERSION = 2;
 
     private static final String UNINITIALISED_SKYLIGHT_TAG = "starlight.skylight_uninit";
     private static final String STARLIGHT_VERSION_TAG = "starlight.light_version";
@@ -37,8 +38,8 @@ public abstract class ChunkSerializerMixin {
             at = @At("RETURN")
     )
     private static void saveLightHook(final ServerWorld world, final Chunk chunk, final CallbackInfoReturnable<CompoundTag> cir) {
-        final int minSection = -1;
-        final int maxSection = 16;
+        final int minSection = WorldUtil.getMinLightSection(world);
+        final int maxSection = WorldUtil.getMaxLightSection(world);
         CompoundTag ret = cir.getReturnValue();
         if (ret == null || ((ExtendedWorld)world).getAnyChunkImmediately(chunk.getPos().x, chunk.getPos().z) != null) {
             return;
@@ -126,15 +127,15 @@ public abstract class ChunkSerializerMixin {
     )
     private static void loadLightHook(final ServerWorld world, final StructureManager structureManager, final PointOfInterestStorage poiStorage,
                                       final ChunkPos pos, final CompoundTag tag, final CallbackInfoReturnable<ProtoChunk> cir) {
-        final int minSection = -1;
-        final int maxSection = 16;
+        final int minSection = WorldUtil.getMinLightSection(world);
+        final int maxSection = WorldUtil.getMaxLightSection(world);
         ProtoChunk ret = cir.getReturnValue();
         if (ret == null) {
             return;
         }
 
-        SWMRNibbleArray[] blockNibbles = StarLightEngine.getFilledEmptyLight();
-        SWMRNibbleArray[] skyNibbles = StarLightEngine.getFilledEmptyLight();
+        SWMRNibbleArray[] blockNibbles = StarLightEngine.getFilledEmptyLight(world);
+        SWMRNibbleArray[] skyNibbles = StarLightEngine.getFilledEmptyLight(world);
 
 
         // start copy from from the original method

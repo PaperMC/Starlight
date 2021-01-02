@@ -1,9 +1,9 @@
 package ca.spottedleaf.starlight.common.light;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
-import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.util.IntegerUtil;
+import ca.spottedleaf.starlight.common.util.WorldUtil;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortCollection;
@@ -18,6 +18,7 @@ import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
 import net.minecraft.world.LightType;
+import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkProvider;
 import net.minecraft.world.chunk.ChunkSection;
@@ -84,27 +85,27 @@ public abstract class StarLightEngine {
     // exactly how the vanilla light engine should behave for minecraft.
 
     // similar to the above, except the chunk section indices vary from [-1, 1], or [0, 2]
-    // for the y chunk section it's from [-1, 16] or [0, 17]
+    // for the y chunk section it's from [minLightSection, maxLightSection] or [0, maxLightSection - minLightSection]
     // index = x + (z * 5) + (y * 25)
     // null index indicates the chunk section doesn't exist (empty or out of bounds)
-    protected final ChunkSection[] sectionCache = new ChunkSection[5 * 5 * (16 + 2 + 2)]; // add two extra sections for buffer
+    protected final ChunkSection[] sectionCache;
 
     // the exact same as above, except for storing fast access to SWMRNibbleArray
-    // for the y chunk section it's from [-1, 16] or [0, 17]
+    // for the y chunk section it's from [minLightSection, maxLightSection] or [0, maxLightSection - minLightSection]
     // index = x + (z * 5) + (y * 25)
-    protected final SWMRNibbleArray[] nibbleCache = new SWMRNibbleArray[5 * 5 * (16 + 2 + 2)]; // add two extra sections for buffer
+    protected final SWMRNibbleArray[] nibbleCache;
 
     // the exact same as above, except for storing fast access to nibbles to call change callbacks for
-    // for the y chunk section it's from [-1, 16] or [0, 17]
+    // for the y chunk section it's from [minLightSection, maxLightSection] or [0, maxLightSection - minLightSection]
     // index = x + (z * 5) + (y * 25)
-    protected final boolean[] notifyUpdateCache = new boolean[5 * 5 * (16 + 2 + 2)];
+    protected final boolean[] notifyUpdateCache;
 
     // always initialsed during start of lighting. no index is null.
     // index = x + (z * 5)
     protected final Chunk[] chunkCache = new Chunk[5 * 5];
 
     // index = x + (z * 5)
-    protected final boolean[][][] emptinessMapCache = new boolean[5 * 5][][];
+    protected final boolean[][] emptinessMapCache = new boolean[5 * 5][];
 
     protected final BlockPos.Mutable mutablePos1 = new BlockPos.Mutable();
     protected final BlockPos.Mutable mutablePos2 = new BlockPos.Mutable();
@@ -127,16 +128,31 @@ public abstract class StarLightEngine {
     protected final int emittedLightMask;
     protected final boolean isClientSide;
 
-    protected StarLightEngine(final boolean skylightPropagator, final boolean isClientSide) {
+    protected final World world;
+    protected final int minLightSection;
+    protected final int maxLightSection;
+    protected final int minSection;
+    protected final int maxSection;
+
+    protected StarLightEngine(final boolean skylightPropagator, final World world) {
         this.skylightPropagator = skylightPropagator;
         this.emittedLightMask = skylightPropagator ? 0 : 0xF;
-        this.isClientSide = isClientSide;
+        this.isClientSide = world.isClient;
+        this.world = world;
+        this.minLightSection = WorldUtil.getMinLightSection(world);
+        this.maxLightSection = WorldUtil.getMaxLightSection(world);
+        this.minSection = WorldUtil.getMinSection(world);
+        this.maxSection = WorldUtil.getMaxSection(world);
+
+        this.sectionCache = new ChunkSection[5 * 5 * ((this.maxLightSection - this.minLightSection + 1) + 2)]; // add two extra sections for buffer
+        this.nibbleCache = new SWMRNibbleArray[5 * 5 * ((this.maxLightSection - this.minLightSection + 1) + 2)]; // add two extra sections for buffer
+        this.notifyUpdateCache = new boolean[5 * 5 * ((this.maxLightSection - this.minLightSection + 1) + 2)]; // add two extra sections for buffer
     }
 
     protected final void setupEncodeOffset(final int centerX, final int centerY, final int centerZ) {
         // 31 = center + encodeOffset
         this.encodeOffsetX = 31 - centerX;
-        this.encodeOffsetY = 31; // we want 0 to be the smallest encoded value
+        this.encodeOffsetY = (-(this.minLightSection - 1) << 4); // we want 0 to be the smallest encoded value
         this.encodeOffsetZ = 31 - centerZ;
 
         // coordinateIndex = x | (z << 6) | (y << 12)
@@ -144,7 +160,7 @@ public abstract class StarLightEngine {
 
         // 2 = (centerX >> 4) + chunkOffset
         this.chunkOffsetX = 2 - (centerX >> 4);
-        this.chunkOffsetY = 2; // lowest should be 0, not -2
+        this.chunkOffsetY = -(this.minLightSection - 1); // lowest should be 0
         this.chunkOffsetZ = 2 - (centerZ >> 4);
 
         // chunk index = x + (5 * z)
@@ -154,24 +170,25 @@ public abstract class StarLightEngine {
         this.chunkSectionIndexOffset = this.chunkIndexOffset + ((5 * 5) * this.chunkOffsetY);
     }
 
-    protected final void setupCaches(final ChunkProvider chunkProvider, final int centerX, final int centerY, final int centerZ, final boolean relaxed) {
+    protected final void setupCaches(final ChunkProvider chunkProvider, final int centerX, final int centerY, final int centerZ,
+                                     final boolean relaxed, final boolean tryToLoadChunksFor2Radius) {
         final int centerChunkX = centerX >> 4;
         final int centerChunkY = centerY >> 4;
         final int centerChunkZ = centerZ >> 4;
 
         this.setupEncodeOffset(centerChunkX * 16 + 7, centerChunkY * 16 + 7, centerChunkZ * 16 + 7);
 
-        final int minX = centerChunkX - 1;
-        final int minZ = centerChunkZ - 1;
-        final int maxX = centerChunkX + 1;
-        final int maxZ = centerChunkZ + 1;
+        final int radius = tryToLoadChunksFor2Radius ? 2 : 1;
 
-        for (int cx = minX; cx <= maxX; ++cx) {
-            for (int cz = minZ; cz <= maxZ; ++cz) {
+        for (int dz = -radius; dz <= radius; ++dz) {
+            for (int dx = -radius; dx <= radius; ++dx) {
+                final int cx = centerChunkX + dx;
+                final int cz = centerChunkZ + dz;
+                final boolean isTwoRadius = Math.max(IntegerUtil.branchlessAbs(dx), IntegerUtil.branchlessAbs(dz)) == 2;
                 final Chunk chunk = (Chunk)chunkProvider.getChunk(cx, cz); // mappings are awful here, this is the "get chunk at if at least features"
 
                 if (chunk == null) {
-                    if (relaxed) {
+                    if (relaxed | isTwoRadius) {
                         continue;
                     }
                     throw new IllegalArgumentException("Trying to propagate light update before 1 radius neighbours ready");
@@ -182,9 +199,11 @@ public abstract class StarLightEngine {
                 }
 
                 this.setChunkInCache(cx, cz, chunk);
-                this.setBlocksForChunkInCache(cx, cz, chunk.getSectionArray());
-                this.setNibblesForChunkInCache(cx, cz, this.getNibblesOnChunk(chunk));
                 this.setEmptinessMapCache(cx, cz, this.getEmptinessMap(chunk));
+                if (!isTwoRadius) {
+                    this.setBlocksForChunkInCache(cx, cz, chunk.getSectionArray());
+                    this.setNibblesForChunkInCache(cx, cz, this.getNibblesOnChunk(chunk));
+                }
             }
         }
     }
@@ -206,9 +225,9 @@ public abstract class StarLightEngine {
     }
 
     protected final void setBlocksForChunkInCache(final int chunkX, final int chunkZ, final ChunkSection[] sections) {
-        for (int cy = -1; cy <= 16; ++cy) {
+        for (int cy = this.minLightSection; cy <= this.maxLightSection; ++cy) {
             this.setChunkSectionInCache(chunkX, cy, chunkZ,
-                    sections == null ? null : (cy >= 0 && cy <= 15 ? (sections[cy] == null || sections[cy].isEmpty() ? EMPTY_CHUNK_SECTION : sections[cy]) : EMPTY_CHUNK_SECTION));
+                    sections == null ? null : (cy >= this.minSection && cy <= this.maxSection ? (sections[cy - this.minSection] == null || sections[cy - this.minSection].isEmpty() ? EMPTY_CHUNK_SECTION : sections[cy - this.minSection]) : EMPTY_CHUNK_SECTION));
         }
     }
 
@@ -217,10 +236,10 @@ public abstract class StarLightEngine {
     }
 
     protected final SWMRNibbleArray[] getNibblesForChunkFromCache(final int chunkX, final int chunkZ) {
-        final SWMRNibbleArray[] ret = getEmptyLightArray();
+        final SWMRNibbleArray[] ret = new SWMRNibbleArray[this.maxLightSection - this.minLightSection + 1];
 
-        for (int cy = -1; cy <= 16; ++cy) {
-            ret[cy + 1] = this.nibbleCache[chunkX + 5*chunkZ + (cy * (5 * 5)) + this.chunkSectionIndexOffset];
+        for (int cy = this.minLightSection; cy <= this.maxLightSection; ++cy) {
+            ret[cy - this.minLightSection] = this.nibbleCache[chunkX + 5*chunkZ + (cy * (5 * 5)) + this.chunkSectionIndexOffset];
         }
 
         return ret;
@@ -231,8 +250,8 @@ public abstract class StarLightEngine {
     }
 
     protected final void setNibblesForChunkInCache(final int chunkX, final int chunkZ, final SWMRNibbleArray[] nibbles) {
-        for (int cy = -1; cy <= 16; ++cy) {
-            this.setNibbleInCache(chunkX, cy, chunkZ, nibbles == null ? null : nibbles[cy + 1]);
+        for (int cy = this.minLightSection; cy <= this.maxLightSection; ++cy) {
+            this.setNibbleInCache(chunkX, cy, chunkZ, nibbles == null ? null : nibbles[cy - this.minLightSection]);
         }
     }
 
@@ -359,11 +378,11 @@ public abstract class StarLightEngine {
         }
     }
 
-    protected final boolean[][] getEmptinessMap(final int chunkX, final int chunkZ) {
+    protected final boolean[] getEmptinessMap(final int chunkX, final int chunkZ) {
         return this.emptinessMapCache[chunkX + 5*chunkZ + this.chunkIndexOffset];
     }
 
-    protected final void setEmptinessMapCache(final int chunkX, final int chunkZ, final boolean[][] emptinessMap) {
+    protected final void setEmptinessMapCache(final int chunkX, final int chunkZ, final boolean[] emptinessMap) {
         this.emptinessMapCache[chunkX + 5*chunkZ + this.chunkIndexOffset] = emptinessMap;
     }
 
@@ -373,8 +392,20 @@ public abstract class StarLightEngine {
         return ret == -1 ? dfl : ret;
     }
 
+    /**
+     * @deprecated To be removed in 1.17 due to variable section count
+     */
+    @Deprecated
     public static SWMRNibbleArray[] getFilledEmptyLight() {
-        final SWMRNibbleArray[] ret = getEmptyLightArray();
+        return getFilledEmptyLight(16 - (-1) + 1);
+    }
+
+    public static SWMRNibbleArray[] getFilledEmptyLight(final World world) {
+        return getFilledEmptyLight(WorldUtil.getTotalLightSections(world));
+    }
+
+    private static SWMRNibbleArray[] getFilledEmptyLight(final int totalLightSections) {
+        final SWMRNibbleArray[] ret = new SWMRNibbleArray[totalLightSections];
 
         for (int i = 0, len = ret.length; i < len; ++i) {
             ret[i] = new SWMRNibbleArray(null, true);
@@ -383,11 +414,9 @@ public abstract class StarLightEngine {
         return ret;
     }
 
-    public static SWMRNibbleArray[] getEmptyLightArray() {
-        return new SWMRNibbleArray[16 - (-1) + 1];
-    }
+    protected abstract boolean[] getEmptinessMap(final Chunk chunk);
 
-    protected abstract boolean[][] getEmptinessMap(final Chunk chunk);
+    protected abstract void setEmptinessMap(final Chunk chunk, final boolean[] to);
 
     protected abstract SWMRNibbleArray[] getNibblesOnChunk(final Chunk chunk);
 
@@ -397,14 +426,17 @@ public abstract class StarLightEngine {
 
     public final void blocksChangedInChunk(final ChunkProvider lightAccess, final int chunkX, final int chunkZ,
                                            final Set<BlockPos> positions, final Boolean[] changedSections) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, this.isClientSide);
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, this.isClientSide, true);
         try {
             final Chunk chunk = this.getChunkInCache(chunkX, chunkZ);
             if (this.isClientSide && chunk == null) {
                 return;
             }
             if (changedSections != null) {
-                this.handleEmptySectionChanges(lightAccess, chunk, changedSections, false);
+                final boolean[] ret = this.handleEmptySectionChanges(lightAccess, chunk, changedSections, false);
+                if (ret != null) {
+                    this.setEmptinessMap(chunk, ret);
+                }
             }
             if (!positions.isEmpty()) {
                 this.propagateBlockChanges(lightAccess, chunk, positions);
@@ -627,9 +659,8 @@ public abstract class StarLightEngine {
     }
 
     public static Boolean[] getEmptySectionsForChunk(final Chunk chunk) {
-        final Boolean[] ret = new Boolean[16];
-
         final ChunkSection[] sections = chunk.getSectionArray();
+        final Boolean[] ret = new Boolean[sections.length];
 
         for (int i = 0; i < sections.length; ++i) {
             if (sections[i] == null || sections[i].isEmpty()) {
@@ -644,7 +675,7 @@ public abstract class StarLightEngine {
 
     public final void handleEmptySectionChanges(final ChunkProvider lightAccess, final int chunkX, final int chunkZ,
                                                 final Boolean[] emptinessChanges) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, this.isClientSide);
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, this.isClientSide, true);
         if (this.isClientSide) {
             // force current chunk into cache
             final Chunk chunk =  (Chunk)lightAccess.getChunk(chunkX, chunkZ);
@@ -662,7 +693,10 @@ public abstract class StarLightEngine {
             if (chunk == null) {
                 return;
             }
-            this.handleEmptySectionChanges(lightAccess, chunk, emptinessChanges, false);
+            final boolean[] ret = this.handleEmptySectionChanges(lightAccess, chunk, emptinessChanges, false);
+            if (ret != null) {
+                this.setEmptinessMap(chunk, ret);
+            }
             this.updateVisible(lightAccess);
         } finally {
             this.destroyCaches();
@@ -673,11 +707,12 @@ public abstract class StarLightEngine {
     // subclasses should not invoke updateVisible, as this will always be done by the super call
     // subclasses are guaranteed that this is always called before a changed block set
     // newChunk specifies whether the changes describe a "first load" of a chunk or changes to existing, already loaded chunks
-    protected abstract void handleEmptySectionChanges(final ChunkProvider lightAccess, final Chunk chunk,
-                                                      final Boolean[] emptinessChanges, final boolean unlit);
+    // rets non-null when the emptiness map changed and needs to be updated
+    protected abstract boolean[] handleEmptySectionChanges(final ChunkProvider lightAccess, final Chunk chunk,
+                                                           final Boolean[] emptinessChanges, final boolean unlit);
 
     public final void checkChunkEdges(final ChunkProvider lightAccess, final int chunkX, final int chunkZ) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true);
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, false);
         try {
             final Chunk chunk = this.getChunkInCache(chunkX, chunkZ);
             if (chunk == null) {
@@ -691,7 +726,7 @@ public abstract class StarLightEngine {
     }
 
     public final void checkChunkEdges(final ChunkProvider lightAccess, final int chunkX, final int chunkZ, final ShortCollection sections) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true);
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, false);
         try {
             final Chunk chunk = this.getChunkInCache(chunkX, chunkZ);
             if (chunk == null) {
@@ -713,7 +748,7 @@ public abstract class StarLightEngine {
     protected abstract void lightChunk(final ChunkProvider lightAccess, final Chunk chunk, final boolean needsEdgeChecks);
 
     public final void light(final ChunkProvider lightAccess, final int chunkX, final int chunkZ, final Boolean[] emptySections) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, false);
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, false, true);
         // force current chunk into cache
         final Chunk chunk =  (Chunk)lightAccess.getChunk(chunkX, chunkZ);
         this.setChunkInCache(chunkX, chunkZ, chunk);
@@ -722,86 +757,12 @@ public abstract class StarLightEngine {
         this.setEmptinessMapCache(chunkX, chunkZ, this.getEmptinessMap(chunk));
 
         try {
-            this.handleEmptySectionChanges(lightAccess, chunk, emptySections, true);
+            final boolean[] ret = this.handleEmptySectionChanges(lightAccess, chunk, emptySections, true);
+            if (ret != null) {
+                this.setEmptinessMap(chunk, ret);
+            }
             this.lightChunk(lightAccess, chunk, false);
             this.updateVisible(lightAccess);
-        } finally {
-            this.destroyCaches();
-        }
-    }
-
-    public final void relight(final ChunkProvider lightAccess, final int chunkX, final int chunkZ) {
-        final Chunk chunk = (Chunk)lightAccess.getChunk(chunkX, chunkZ);
-        this.relightChunk(lightAccess, chunk);
-    }
-
-    protected final void relightChunk(final ChunkProvider lightAccess, final Chunk chunk) {
-        final ChunkPos chunkPos = chunk.getPos();
-
-        // ensure the emptiness map will be correct for the chunk
-        this.handleEmptySectionChanges(lightAccess, chunkPos.x, chunkPos.z, getEmptySectionsForChunk(chunk));
-
-        this.setupEncodeOffset(chunkPos.x * 16 + 7, 128, chunkPos.z * 16 + 7);
-
-        try {
-            final SWMRNibbleArray[][] chunkNibbles = new SWMRNibbleArray[(2 * 1 + 1) * (2 * 1 + 1)][];
-            for (int i = 0; i < chunkNibbles.length; ++i) {
-                chunkNibbles[i] = getFilledEmptyLight();
-            }
-
-            this.setChunkInCache(chunkPos.x, chunkPos.z, chunk);
-            this.setBlocksForChunkInCache(chunkPos.x, chunkPos.z, chunk.getSectionArray());
-            this.setNibblesForChunkInCache(chunkPos.x, chunkPos.z, chunkNibbles[ExtendedChunk.getEmptinessMapIndex(0, 0)]);
-            this.setEmptinessMapCache(chunkPos.x, chunkPos.z, new boolean[9][]);
-
-            this.handleEmptySectionChanges(lightAccess, chunk, getEmptySectionsForChunk(chunk), true);
-            this.lightChunk(lightAccess, chunk, false);
-
-            for (int dz = -1; dz <= 1; ++dz) {
-                for (int dx = -1; dx <= 1; ++dx) {
-                    if ((dx | dz) == 0) {
-                        continue;
-                    }
-
-                    final int cx = dx + chunkPos.x;
-                    final int cz = dz + chunkPos.z;
-                    final Chunk neighbourChunk = (Chunk)lightAccess.getChunk(cx, cz);
-
-                    if (neighbourChunk == null || !this.canUseChunk(neighbourChunk)) {
-                        continue;
-                    }
-
-                    for (int dz2 = -1; dz2 <= 1; ++dz2) {
-                        for (int dx2 = -1; dx2 <= 1; ++dx2) {
-                            final Chunk neighbour = this.getChunkInCache(dx2 + chunkPos.x, dz2 + chunkPos.z);
-                            if (neighbour == null) {
-                                continue;
-                            }
-
-                            // re-insert nibbles for chunk, they might have been removed due to the emptiness map
-                            this.setNibblesForChunkInCache(dx2 + chunkPos.x, dz2 + chunkPos.z, chunkNibbles[ExtendedChunk.getEmptinessMapIndex(dx2, dz2)]);
-                        }
-                    }
-
-                    this.setChunkInCache(cx, cz, neighbourChunk);
-                    this.setBlocksForChunkInCache(cx, cz, neighbourChunk.getSectionArray());
-                    this.setNibblesForChunkInCache(cx, cz, chunkNibbles[ExtendedChunk.getEmptinessMapIndex(dx, dz)]);
-                    this.setEmptinessMapCache(cx, cz, new boolean[9][]);
-
-                    this.handleEmptySectionChanges(lightAccess, neighbourChunk, getEmptySectionsForChunk(neighbourChunk), true);
-                    this.lightChunk(lightAccess, neighbourChunk, false);
-                }
-            }
-
-            for (final SWMRNibbleArray nibble : chunkNibbles[ExtendedChunk.getEmptinessMapIndex(0, 0)]) {
-                nibble.updateVisible();
-            }
-
-            this.setNibbles(chunk, chunkNibbles[ExtendedChunk.getEmptinessMapIndex(0, 0)]);
-
-            for (int y = -1; y <= 16; ++y) {
-                lightAccess.onLightUpdate(this.skylightPropagator ? LightType.SKY : LightType.BLOCK, ChunkSectionPos.from(chunkPos.x, y, chunkPos.z));
-            }
         } finally {
             this.destroyCaches();
         }
@@ -813,7 +774,7 @@ public abstract class StarLightEngine {
         // the region of chunks to relight
         // it's required that tickets are added for each chunk to keep them loaded
         final Long2ObjectOpenHashMap<SWMRNibbleArray[]> nibblesByChunk = new Long2ObjectOpenHashMap<>();
-        final Long2ObjectOpenHashMap<boolean[][]> emptinessMapByChunk = new Long2ObjectOpenHashMap<>();
+        final Long2ObjectOpenHashMap<boolean[]> emptinessMapByChunk = new Long2ObjectOpenHashMap<>();
 
         final int[] neighbourLightOrder = new int[] {
                 // d = 0
@@ -838,8 +799,7 @@ public abstract class StarLightEngine {
                 throw new IllegalStateException();
             }
 
-            // force update emptiness map so we can guarantee it's correct after we're done
-            this.handleEmptySectionChanges(lightAccess, chunkX, chunkZ, getEmptySectionsForChunk(chunk));
+            boolean[] emptinessMap = null;
 
             for (int i = 0, len = neighbourLightOrder.length; i < len; i += 2) {
                 final int dx = neighbourLightOrder[i];
@@ -887,17 +847,19 @@ public abstract class StarLightEngine {
                     final long key = CoordinateUtils.getChunkKey(neighbourX, neighbourZ);
 
                     // now insert the neighbour chunk and light it
-                    final SWMRNibbleArray[] nibbles = getFilledEmptyLight();
-                    final boolean[][] emptinessMap = new boolean[(2 * 1 + 1) * (2 * 1 + 1)][];
+                    final SWMRNibbleArray[] nibbles = getFilledEmptyLight(this.world);
                     nibblesByChunk.put(key, nibbles);
-                    emptinessMapByChunk.put(key, emptinessMap);
 
                     this.setChunkInCache(neighbourX, neighbourZ, neighbour);
                     this.setBlocksForChunkInCache(neighbourX, neighbourZ, neighbour.getSectionArray());
                     this.setNibblesForChunkInCache(neighbourX, neighbourZ, nibbles);
-                    this.setEmptinessMapCache(neighbourX, neighbourZ, emptinessMap);
 
-                    this.handleEmptySectionChanges(lightAccess, neighbour, getEmptySectionsForChunk(neighbour), true);
+                    final boolean[] neighbourEmptiness = this.handleEmptySectionChanges(lightAccess, neighbour, getEmptySectionsForChunk(neighbour), true);
+                    emptinessMapByChunk.put(key, neighbourEmptiness);
+                    if ((dx | dz) == 0) {
+                        emptinessMap = neighbourEmptiness;
+                    }
+
                     this.lightChunk(lightAccess, neighbour, false);
                 } finally {
                     this.destroyCaches();
@@ -913,13 +875,16 @@ public abstract class StarLightEngine {
             }
 
             this.setNibbles(chunk, nibbles);
+            this.setEmptinessMap(chunk, emptinessMap);
 
-            for (int y = -1; y <= 16; ++y) {
+            for (int y = this.minLightSection; y <= this.maxLightSection; ++y) {
                 lightAccess.onLightUpdate(this.skylightPropagator ? LightType.SKY : LightType.BLOCK, ChunkSectionPos.from(chunkX, y, chunkX));
             }
 
             // now do callback
-            chunkLightCallback.accept(chunkPos);
+            if (chunkLightCallback != null) {
+                chunkLightCallback.accept(chunkPos);
+            }
         }
     }
 

@@ -3,6 +3,7 @@ package ca.spottedleaf.starlight.mixin.common.chunk;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
+import ca.spottedleaf.starlight.common.util.WorldUtil;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.EmptyChunk;
@@ -19,7 +20,7 @@ public abstract class EmptyChunkMixin extends WorldChunk implements Chunk, Exten
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {
-        return StarLightEngine.getFilledEmptyLight();
+        return StarLightEngine.getFilledEmptyLight(this.getWorld());
     }
 
     @Override
@@ -27,14 +28,17 @@ public abstract class EmptyChunkMixin extends WorldChunk implements Chunk, Exten
 
     @Override
     public SWMRNibbleArray[] getSkyNibbles() {
-        return StarLightEngine.getFilledEmptyLight();
+        return StarLightEngine.getFilledEmptyLight(this.getWorld());
     }
 
     @Override
     public void setSkyNibbles(final SWMRNibbleArray[] nibbles) {}
 
     @Override
-    public boolean[][] getEmptinessMap() {
-        return new boolean[9][];
+    public boolean[] getEmptinessMap() {
+        return null;
     }
+
+    @Override
+    public void setEmptinessMap(final boolean[] emptinessMap) {}
 }

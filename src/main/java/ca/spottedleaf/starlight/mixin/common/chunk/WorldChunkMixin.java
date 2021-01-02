@@ -31,7 +31,7 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
     private volatile SWMRNibbleArray[] skyNibbles;
 
     @Unique
-    private boolean[][] emptinessMap;
+    private volatile boolean[] emptinessMap;
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {
@@ -54,8 +54,13 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
     }
 
     @Override
-    public boolean[][] getEmptinessMap() {
+    public boolean[] getEmptinessMap() {
         return this.emptinessMap;
+    }
+
+    @Override
+    public void setEmptinessMap(final boolean[] emptinessMap) {
+        this.emptinessMap = emptinessMap;
     }
 
     /**
@@ -69,7 +74,7 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
     public void onTransitionToFull(final World world, final ProtoChunk protoChunk, final CallbackInfo ci) {
         this.setBlockNibbles(((ExtendedChunk)protoChunk).getBlockNibbles());
         this.setSkyNibbles(((ExtendedChunk)protoChunk).getSkyNibbles());
-        this.emptinessMap = ((ExtendedChunk)protoChunk).getEmptinessMap();
+        this.setEmptinessMap(((ExtendedChunk)protoChunk).getEmptinessMap());
     }
 
     /**
@@ -84,8 +89,7 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
                             final TickScheduler<Block> blockTickScheduler, final TickScheduler<Fluid> fluidTickScheduler,
                             final long inhabitedTime, final ChunkSection[] sections, final Consumer<WorldChunk> loadToWorldConsumer,
                             final CallbackInfo ci) {
-        this.blockNibbles = StarLightEngine.getFilledEmptyLight();
-        this.skyNibbles = StarLightEngine.getFilledEmptyLight();
-        this.emptinessMap = new boolean[9][];
+        this.blockNibbles = StarLightEngine.getFilledEmptyLight(world);
+        this.skyNibbles = StarLightEngine.getFilledEmptyLight(world);
     }
 }

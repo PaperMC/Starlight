@@ -44,7 +44,12 @@ public abstract class ReadOnlyChunkMixin extends ProtoChunk implements Chunk, Ex
     }
 
     @Override
-    public boolean[][] getEmptinessMap() {
+    public boolean[] getEmptinessMap() {
         return ((ExtendedChunk)this.wrapped).getEmptinessMap();
+    }
+
+    @Override
+    public void setEmptinessMap(final boolean[] emptinessMap) {
+        ((ExtendedChunk)this.wrapped).setEmptinessMap(emptinessMap);
     }
 }
