@@ -614,11 +614,12 @@ public abstract class StarLightEngine {
                             continue;
                         }
 
-                        this.increaseQueue[this.increaseQueueInitialLength++] =
+                        this.appendToIncreaseQueue(
                                 ((currX + (currZ << 6) + (currY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                         | ((level & 0xFL) << (6 + 6 + 16))
                                         | (propagateDirection << (6 + 6 + 16 + 4))
-                                        | FLAG_HAS_SIDED_TRANSPARENT_BLOCKS; // don't know if the current block is transparent, must check.
+                                        | FLAG_HAS_SIDED_TRANSPARENT_BLOCKS // don't know if the current block is transparent, must check.
+                        );
                     }
                 }
             }
@@ -939,10 +940,40 @@ public abstract class StarLightEngine {
     // whether the propagation needs to consider if its block is conditionally transparent
     protected static final long FLAG_HAS_SIDED_TRANSPARENT_BLOCKS = Long.MIN_VALUE;
 
-    protected final long[] increaseQueue = new long[16 * 16 * (16 * (16 + 2)) * 9 + 1];
+    protected long[] increaseQueue = new long[16 * 16 * 16];
     protected int increaseQueueInitialLength;
-    protected final long[] decreaseQueue = new long[16 * 16 * (16 * (16 + 2)) * 9 + 1];
+    protected long[] decreaseQueue = new long[16 * 16 * 16];
     protected int decreaseQueueInitialLength;
+
+    protected final long[] resizeIncreaseQueue() {
+        return this.increaseQueue = Arrays.copyOf(this.increaseQueue, this.increaseQueue.length * 2);
+    }
+
+    protected final long[] resizeDecreaseQueue() {
+        return this.decreaseQueue = Arrays.copyOf(this.decreaseQueue, this.decreaseQueue.length * 2);
+    }
+
+    protected final void appendToIncreaseQueue(final long value) {
+        final int idx = this.increaseQueueInitialLength++;
+        long[] queue = this.increaseQueue;
+        if (idx >= queue.length) {
+            queue = this.resizeIncreaseQueue();
+            queue[idx] = value;
+        } else {
+            queue[idx] = value;
+        }
+    }
+
+    protected final void appendToDecreaseQueue(final long value) {
+        final int idx = this.decreaseQueueInitialLength++;
+        long[] queue = this.decreaseQueue;
+        if (idx >= queue.length) {
+            queue = this.resizeDecreaseQueue();
+            queue[idx] = value;
+        } else {
+            queue[idx] = value;
+        }
+    }
 
     protected static final AxisDirection[][] OLD_CHECK_DIRECTIONS = new AxisDirection[1 << 6][];
     protected static final int ALL_DIRECTIONS_BITSET = (1 << 6) - 1;
@@ -958,7 +989,7 @@ public abstract class StarLightEngine {
 
     protected final void performLightIncrease(final ChunkProvider lightAccess) {
         final BlockView world = lightAccess.getWorld();
-        final long[] queue = this.increaseQueue;
+        long[] queue = this.increaseQueue;
         int queueReadIndex = 0;
         int queueLength = this.increaseQueueInitialLength;
         this.increaseQueueInitialLength = 0;
@@ -1013,6 +1044,9 @@ public abstract class StarLightEngine {
                             this.postLightUpdate(offX, offY, offZ);
 
                             if (targetLevel > 1) {
+                                if (queueLength >= queue.length) {
+                                    queue = this.resizeIncreaseQueue();
+                                }
                                 queue[queueLength++] =
                                         ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                                 | ((targetLevel & 0xFL) << (6 + 6 + 16))
@@ -1043,6 +1077,9 @@ public abstract class StarLightEngine {
                         this.postLightUpdate(offX, offY, offZ);
 
                         if (targetLevel > 1) {
+                            if (queueLength >= queue.length) {
+                                queue = this.resizeIncreaseQueue();
+                            }
                             queue[queueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((targetLevel & 0xFL) << (6 + 6 + 16))
@@ -1090,6 +1127,9 @@ public abstract class StarLightEngine {
                             this.postLightUpdate(offX, offY, offZ);
 
                             if (targetLevel > 1) {
+                                if (queueLength >= queue.length) {
+                                    queue = this.resizeIncreaseQueue();
+                                }
                                 queue[queueLength++] =
                                         ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                                 | ((targetLevel & 0xFL) << (6 + 6 + 16))
@@ -1120,6 +1160,9 @@ public abstract class StarLightEngine {
                         this.postLightUpdate(offX, offY, offZ);
 
                         if (targetLevel > 1) {
+                            if (queueLength >= queue.length) {
+                                queue = this.resizeIncreaseQueue();
+                            }
                             queue[queueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((targetLevel & 0xFL) << (6 + 6 + 16))
@@ -1135,8 +1178,8 @@ public abstract class StarLightEngine {
 
     protected final void performLightDecrease(final ChunkProvider lightAccess) {
         final BlockView world = lightAccess.getWorld();
-        final long[] queue = this.decreaseQueue;
-        final long[] increaseQueue = this.increaseQueue;
+        long[] queue = this.decreaseQueue;
+        long[] increaseQueue = this.increaseQueue;
         int queueReadIndex = 0;
         int queueLength = this.decreaseQueueInitialLength;
         this.decreaseQueueInitialLength = 0;
@@ -1185,6 +1228,9 @@ public abstract class StarLightEngine {
                         final int targetLevel = Math.max(0, propagatedLightLevel - Math.max(1, opacityCached));
                         if (lightLevel > targetLevel) {
                             // it looks like another source propagated here, so re-propagate it
+                            if (increaseQueueLength >= increaseQueue.length) {
+                                increaseQueue = this.resizeIncreaseQueue();
+                            }
                             increaseQueue[increaseQueueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((lightLevel & 0xFL) << (6 + 6 + 16))
@@ -1195,6 +1241,9 @@ public abstract class StarLightEngine {
                         final int emittedLight = (customLightHandler != null ? this.getCustomLightLevel(customLightHandler, offX, offY, offZ, blockState.getLuminance()) : blockState.getLuminance()) & emittedMask;
                         if (emittedLight != 0) {
                             // re-propagate source
+                            if (increaseQueueLength >= increaseQueue.length) {
+                                increaseQueue = this.resizeIncreaseQueue();
+                            }
                             increaseQueue[increaseQueueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((emittedLight & 0xFL) << (6 + 6 + 16))
@@ -1206,6 +1255,9 @@ public abstract class StarLightEngine {
                         this.postLightUpdate(offX, offY, offZ);
 
                         if (targetLevel > 0) { // we actually need to propagate 0 just in case we find a neighbour...
+                            if (queueLength >= queue.length) {
+                                queue = this.resizeDecreaseQueue();
+                            }
                             queue[queueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((targetLevel & 0xFL) << (6 + 6 + 16))
@@ -1229,6 +1281,9 @@ public abstract class StarLightEngine {
                         final int targetLevel = Math.max(0, propagatedLightLevel - Math.max(1, opacity));
                         if (lightLevel > targetLevel) {
                             // it looks like another source propagated here, so re-propagate it
+                            if (increaseQueueLength >= increaseQueue.length) {
+                                increaseQueue = this.resizeIncreaseQueue();
+                            }
                             increaseQueue[increaseQueueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((lightLevel & 0xFL) << (6 + 6 + 16))
@@ -1239,6 +1294,9 @@ public abstract class StarLightEngine {
                         final int emittedLight = (customLightHandler != null ? this.getCustomLightLevel(customLightHandler, offX, offY, offZ, blockState.getLuminance()) : blockState.getLuminance()) & emittedMask;
                         if (emittedLight != 0) {
                             // re-propagate source
+                            if (increaseQueueLength >= increaseQueue.length) {
+                                increaseQueue = this.resizeIncreaseQueue();
+                            }
                             increaseQueue[increaseQueueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((emittedLight & 0xFL) << (6 + 6 + 16))
@@ -1250,6 +1308,9 @@ public abstract class StarLightEngine {
                         this.postLightUpdate(offX, offY, offZ);
 
                         if (targetLevel > 0) {
+                            if (queueLength >= queue.length) {
+                                queue = this.resizeDecreaseQueue();
+                            }
                             queue[queueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((targetLevel & 0xFL) << (6 + 6 + 16))
@@ -1294,6 +1355,9 @@ public abstract class StarLightEngine {
                         final int targetLevel = Math.max(0, propagatedLightLevel - Math.max(1, opacityCached));
                         if (lightLevel > targetLevel) {
                             // it looks like another source propagated here, so re-propagate it
+                            if (increaseQueueLength >= increaseQueue.length) {
+                                increaseQueue = this.resizeIncreaseQueue();
+                            }
                             increaseQueue[increaseQueueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((lightLevel & 0xFL) << (6 + 6 + 16))
@@ -1304,6 +1368,9 @@ public abstract class StarLightEngine {
                         final int emittedLight = (customLightHandler != null ? this.getCustomLightLevel(customLightHandler, offX, offY, offZ, blockState.getLuminance()) : blockState.getLuminance()) & emittedMask;
                         if (emittedLight != 0) {
                             // re-propagate source
+                            if (increaseQueueLength >= increaseQueue.length) {
+                                increaseQueue = this.resizeIncreaseQueue();
+                            }
                             increaseQueue[increaseQueueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((emittedLight & 0xFL) << (6 + 6 + 16))
@@ -1315,6 +1382,9 @@ public abstract class StarLightEngine {
                         this.postLightUpdate(offX, offY, offZ);
 
                         if (targetLevel > 0) { // we actually need to propagate 0 just in case we find a neighbour...
+                            if (queueLength >= queue.length) {
+                                queue = this.resizeDecreaseQueue();
+                            }
                             queue[queueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((targetLevel & 0xFL) << (6 + 6 + 16))
@@ -1338,6 +1408,9 @@ public abstract class StarLightEngine {
                         final int targetLevel = Math.max(0, propagatedLightLevel - Math.max(1, opacity));
                         if (lightLevel > targetLevel) {
                             // it looks like another source propagated here, so re-propagate it
+                            if (increaseQueueLength >= increaseQueue.length) {
+                                increaseQueue = this.resizeIncreaseQueue();
+                            }
                             increaseQueue[increaseQueueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((lightLevel & 0xFL) << (6 + 6 + 16))
@@ -1348,6 +1421,9 @@ public abstract class StarLightEngine {
                         final int emittedLight = (customLightHandler != null ? this.getCustomLightLevel(customLightHandler, offX, offY, offZ, blockState.getLuminance()) : blockState.getLuminance()) & emittedMask;
                         if (emittedLight != 0) {
                             // re-propagate source
+                            if (increaseQueueLength >= increaseQueue.length) {
+                                increaseQueue = this.resizeIncreaseQueue();
+                            }
                             increaseQueue[increaseQueueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((emittedLight & 0xFL) << (6 + 6 + 16))
@@ -1359,6 +1435,9 @@ public abstract class StarLightEngine {
                         this.postLightUpdate(offX, offY, offZ);
 
                         if (targetLevel > 0) { // we actually need to propagate 0 just in case we find a neighbour...
+                            if (queueLength >= queue.length) {
+                                queue = this.resizeDecreaseQueue();
+                            }
                             queue[queueLength++] =
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((targetLevel & 0xFL) << (6 + 6 + 16))

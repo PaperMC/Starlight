@@ -65,23 +65,25 @@ public final class BlockStarLightEngine extends StarLightEngine {
         this.setLightLevel(worldX, worldY, worldZ, emittedLevel);
         // this accounts for change in emitted light that would cause an increase
         if (emittedLevel != 0) {
-            this.increaseQueue[this.increaseQueueInitialLength++] =
+            this.appendToIncreaseQueue(
                     ((worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                             | (emittedLevel & 0xFL) << (6 + 6 + 16)
                             | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4))
-                            | (((ExtendedAbstractBlockState)blockState).isConditionallyFullOpaque() ? FLAG_HAS_SIDED_TRANSPARENT_BLOCKS : 0);
+                            | (((ExtendedAbstractBlockState)blockState).isConditionallyFullOpaque() ? FLAG_HAS_SIDED_TRANSPARENT_BLOCKS : 0)
+            );
         }
         // this also accounts for a change in emitted light that would cause a decrease
         // this also accounts for the change of direction of propagation (i.e old block was full transparent, new block is full opaque or vice versa)
         // as it checks all neighbours (even if current level is 0)
-        this.decreaseQueue[this.decreaseQueueInitialLength++] =
+        this.appendToDecreaseQueue(
                 ((worldX + (worldZ << 6) + (worldY << (6 + 6)) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                         | (currentLevel & 0xFL) << (6 + 6 + 16)
-                        | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4));
+                        | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4))
                         // always keep sided transparent false here, new block might be conditionally transparent which would
                         // prevent us from decreasing sources in the directions where the new block is opaque
                         // if it turns out we were wrong to de-propagate the source, the re-propagate logic WILL always
                         // catch that and fix it.
+        );
         // re-propagating neighbours (done by the decrease queue) will also account for opacity changes in this block
     }
 
@@ -152,11 +154,12 @@ public final class BlockStarLightEngine extends StarLightEngine {
                 continue;
             }
 
-            this.increaseQueue[this.increaseQueueInitialLength++] =
+            this.appendToIncreaseQueue(
                     ((pos.getX() + (pos.getZ() << 6) + (pos.getY() << (6 + 6)) + this.coordinateOffset) & ((1L << (6 + 6 + 16)) - 1))
                             | (emittedLight & 0xFL) << (6 + 6 + 16)
                             | (((long)ALL_DIRECTIONS_BITSET) << (6 + 6 + 16 + 4))
-                            | (((ExtendedAbstractBlockState)blockState).isConditionallyFullOpaque() ? FLAG_HAS_SIDED_TRANSPARENT_BLOCKS : 0);
+                            | (((ExtendedAbstractBlockState)blockState).isConditionallyFullOpaque() ? FLAG_HAS_SIDED_TRANSPARENT_BLOCKS : 0)
+            );
 
 
             // propagation wont set this for us
