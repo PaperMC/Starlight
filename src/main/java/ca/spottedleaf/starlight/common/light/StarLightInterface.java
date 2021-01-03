@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 public final class StarLightInterface {
 
@@ -355,16 +356,18 @@ public final class StarLightInterface {
         }
     }
 
-    public void relightChunks(final Set<ChunkPos> chunks, final Consumer<ChunkPos> chunkLightCallback) {
+    public void relightChunks(final Set<ChunkPos> chunks, final Consumer<ChunkPos> chunkLightCallback,
+                              final IntConsumer onComplete) {
         final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
         final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
 
         try {
             if (skyEngine != null) {
-                skyEngine.relightChunks(this.lightAccess, chunks, blockEngine == null ? chunkLightCallback : null);
+                skyEngine.relightChunks(this.lightAccess, chunks, blockEngine == null ? chunkLightCallback : null,
+                        blockEngine == null ? onComplete : null);
             }
             if (blockEngine != null) {
-                blockEngine.relightChunks(this.lightAccess, chunks, chunkLightCallback);
+                blockEngine.relightChunks(this.lightAccess, chunks, chunkLightCallback, onComplete);
             }
         } finally {
             this.releaseSkyLightEngine(skyEngine);
