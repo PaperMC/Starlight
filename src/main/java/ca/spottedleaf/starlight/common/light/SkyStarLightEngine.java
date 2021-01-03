@@ -109,7 +109,9 @@ public final class SkyStarLightEngine extends StarLightEngine {
             }
         }
 
-        // check for de-init
+        // check for de-init and lazy-init
+        // lazy init is when chunks are being lit, so at the time they weren't loaded when their neighbours were running
+        // init checks.
         for (int dz = -1; dz <= 1; ++dz) {
             for (int dx = -1; dx <= 1; ++dx) {
                 // does this neighbour have 1 radius loaded?
@@ -123,18 +125,9 @@ public final class SkyStarLightEngine extends StarLightEngine {
                         }
                     }
                 }
-                if (!neighboursLoaded) {
-                    // no we don't, so we can check.
-                    continue;
-                }
 
-                // yes we do, so we can check.
                 for (int sectionY = this.maxLightSection; sectionY >= this.minLightSection; --sectionY) {
                     final SWMRNibbleArray nibble = this.getNibbleFromCache(dx + chunkX, sectionY, dz + chunkZ);
-                    if (nibble == null || nibble.isNullNibbleUpdating()) {
-                        // already null
-                        continue;
-                    }
 
                     // check neighbours to see if we need to de-init this one
                     boolean allEmpty = true;
@@ -147,17 +140,36 @@ public final class SkyStarLightEngine extends StarLightEngine {
                                     // empty
                                     continue;
                                 }
-                                if (!this.getEmptinessMap(dx + dx2 + chunkX, dz + dz2 + chunkZ)[y - this.minSection]) {
-                                    allEmpty = false;
-                                    break neighbour_search;
+                                final boolean[] emptinessMap = this.getEmptinessMap(dx + dx2 + chunkX, dz + dz2 + chunkZ);
+                                if (emptinessMap != null) {
+                                    if (!emptinessMap[y - this.minSection]) {
+                                        allEmpty = false;
+                                        break neighbour_search;
+                                    }
+                                } else {
+                                    final ChunkSection section = this.getChunkSection(dx + dx2 + chunkX, y, dz + dz2 + chunkZ);
+                                    if (section != null && section != EMPTY_CHUNK_SECTION) {
+                                        allEmpty = false;
+                                        break neighbour_search;
+                                    }
                                 }
                             }
                         }
                     }
 
-                    if (allEmpty) {
+                    if (allEmpty & neighboursLoaded) {
+                        // can only de-init when neighbours are loaded
+                        // de-init is fine to delay, as de-init is just an optimisation - it's not required for lighting
+                        // to be correct
+
                         // all were empty, so de-init
-                        nibble.setNull();
+                        if (nibble != null) {
+                            nibble.setNull();
+                        }
+                    } else if (!allEmpty) {
+                        // must init
+                        final boolean extrude = (dx | dz) != 0 || !unlit;
+                        this.initNibbleForLitChunk(dx + chunkX, sectionY, dz + chunkZ, extrude, false);
                     }
                 }
             }
