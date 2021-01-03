@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 
 public abstract class StarLightEngine {
 
@@ -769,7 +770,7 @@ public abstract class StarLightEngine {
     }
 
     public final void relightChunks(final ChunkProvider lightAccess, final Set<ChunkPos> chunks,
-                                    final Consumer<ChunkPos> chunkLightCallback) {
+                                    final Consumer<ChunkPos> chunkLightCallback, final IntConsumer onComplete) {
         // it's recommended for maximum performance that the set is ordered according to a BFS from the center of
         // the region of chunks to relight
         // it's required that tickets are added for each chunk to keep them loaded
@@ -791,6 +792,8 @@ public abstract class StarLightEngine {
                 1, -1,
         };
 
+        int lightCalls = 0;
+
         for (final ChunkPos chunkPos : chunks) {
             final int chunkX = chunkPos.x;
             final int chunkZ = chunkPos.z;
@@ -798,8 +801,6 @@ public abstract class StarLightEngine {
             if (chunk == null || !this.canUseChunk(chunk)) {
                 throw new IllegalStateException();
             }
-
-            boolean[] emptinessMap = null;
 
             for (int i = 0, len = neighbourLightOrder.length; i < len; i += 2) {
                 final int dx = neighbourLightOrder[i];
@@ -856,8 +857,8 @@ public abstract class StarLightEngine {
 
                     final boolean[] neighbourEmptiness = this.handleEmptySectionChanges(lightAccess, neighbour, getEmptySectionsForChunk(neighbour), true);
                     emptinessMapByChunk.put(key, neighbourEmptiness);
-                    if ((dx | dz) == 0) {
-                        emptinessMap = neighbourEmptiness;
+                    if (chunks.contains(new ChunkPos(neighbourX, neighbourZ))) {
+                        this.setEmptinessMap(neighbour, neighbourEmptiness);
                     }
 
                     this.lightChunk(lightAccess, neighbour, false);
@@ -875,7 +876,6 @@ public abstract class StarLightEngine {
             }
 
             this.setNibbles(chunk, nibbles);
-            this.setEmptinessMap(chunk, emptinessMap);
 
             for (int y = this.minLightSection; y <= this.maxLightSection; ++y) {
                 lightAccess.onLightUpdate(this.skylightPropagator ? LightType.SKY : LightType.BLOCK, ChunkSectionPos.from(chunkX, y, chunkX));
@@ -885,6 +885,11 @@ public abstract class StarLightEngine {
             if (chunkLightCallback != null) {
                 chunkLightCallback.accept(chunkPos);
             }
+            ++lightCalls;
+        }
+
+        if (onComplete != null) {
+            onComplete.accept(lightCalls);
         }
     }
 
