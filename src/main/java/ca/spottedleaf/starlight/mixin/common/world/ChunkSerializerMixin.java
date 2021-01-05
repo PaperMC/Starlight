@@ -4,7 +4,6 @@ import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.util.WorldUtil;
-import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.nbt.ListNBT;
 import net.minecraft.util.math.ChunkPos;
@@ -24,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ChunkSerializer.class)
 public abstract class ChunkSerializerMixin {
 
-    private static final int STARLIGHT_LIGHT_VERSION = 2;
+    private static final int STARLIGHT_LIGHT_VERSION = 3;
 
     private static final String UNINITIALISED_SKYLIGHT_TAG = "starlight.skylight_uninit";
     private static final String STARLIGHT_VERSION_TAG = "starlight.light_version";
