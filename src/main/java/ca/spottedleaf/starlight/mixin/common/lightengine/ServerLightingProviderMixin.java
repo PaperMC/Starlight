@@ -3,6 +3,8 @@ package ca.spottedleaf.starlight.mixin.common.lightengine;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.light.StarLightInterface;
 import ca.spottedleaf.starlight.common.light.StarLightLightingProvider;
+import ca.spottedleaf.starlight.common.util.CoordinateUtils;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import net.minecraft.server.world.ServerLightingProvider;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.server.world.ThreadedAnvilChunkStorage;
@@ -42,44 +44,47 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
     }
 
     @Unique
-    private long workTicketCounts = 0L;
+    private final Long2IntOpenHashMap chunksBeingWorkedOn = new Long2IntOpenHashMap();
 
     @Unique
     private void queueTaskForSection(final int chunkX, final int chunkY, final int chunkZ, final Runnable runnable) {
-        // TODO this impl is actually fucking awful for checking neighbours and keeping neighbours, for the love of god rewrite it
-
         final ServerWorld world = (ServerWorld)this.getLightEngine().getWorld();
 
+        final Chunk center = this.getLightEngine().getAnyChunkNow(chunkX, chunkZ);
+        if (center == null || !center.getStatus().isAtLeast(ChunkStatus.LIGHT) || !center.isLightOn()) {
+            // do not accept updates in unlit chunks
+            return;
+        }
+
         if (!world.getChunkManager().threadedAnvilChunkStorage.mainThreadExecutor.isOnThread()) {
-            // this is not safe to run off-main, re-schedule
+            // ticket logic is not safe to run off-main, re-schedule
             world.getChunkManager().threadedAnvilChunkStorage.mainThreadExecutor.execute(() -> {
                 this.queueTaskForSection(chunkX, chunkY, chunkZ, runnable);
             });
             return;
         }
 
-        Chunk center = this.getLightEngine().getAnyChunkNow(chunkX, chunkZ);
-        if (center == null || !center.getStatus().isAtLeast(ChunkStatus.LIGHT) || !center.isLightOn()) {
-            // do not accept updates in unlit chunks
-            return;
+        final long key = CoordinateUtils.getChunkKey(chunkX, chunkZ);
+
+        final int references = this.chunksBeingWorkedOn.get(key);
+        this.chunksBeingWorkedOn.put(key, references + 1);
+        if (references == 0) {
+            final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+            world.getChunkManager().addTicket(StarLightInterface.CHUNK_WORK_TICKET, pos, 0, pos);
         }
-
-        final Long ticketId = Long.valueOf(this.workTicketCounts++);
-
-        // ensure 1 radius features is loaded (yes they can UNLOAD)
-        for (int dz = -1; dz <= 1; ++dz) {
-            for (int dx = -1; dx <= 1; ++dx) {
-                world.getChunk(dx + chunkX, dz + chunkZ, (dx | dz) == 0 ? ChunkStatus.LIGHT : ChunkStatus.FEATURES, true);
-            }
-        }
-
-        world.getChunkManager().addTicket(StarLightInterface.CHUNK_WORK_TICKET, new ChunkPos(chunkX, chunkZ), 0, ticketId);
 
         this.enqueue(chunkX, chunkZ, ServerLightingProvider.Stage.PRE_UPDATE, () -> {
             runnable.run();
             this.enqueue(chunkX, chunkZ, ServerLightingProvider.Stage.POST_UPDATE, () -> {
                 world.getChunkManager().threadedAnvilChunkStorage.mainThreadExecutor.execute(() -> {
-                    world.getChunkManager().removeTicket(StarLightInterface.CHUNK_WORK_TICKET, new ChunkPos(chunkX, chunkZ), 0, ticketId);
+                    final int newReferences = this.chunksBeingWorkedOn.get(key);
+                    if (newReferences == 1) {
+                        this.chunksBeingWorkedOn.remove(key);
+                        final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+                        world.getChunkManager().removeTicket(StarLightInterface.CHUNK_WORK_TICKET, pos, 0, pos);
+                    } else {
+                        this.chunksBeingWorkedOn.put(key, newReferences - 1);
+                    }
                 });
             });
         });
@@ -158,10 +163,15 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
         return CompletableFuture.supplyAsync(() -> {
             final Boolean[] emptySections = StarLightEngine.getEmptySectionsForChunk(chunk);
             if (!lit) {
-                this.getLightEngine().lightChunk(chunkPos.x, chunkPos.z, emptySections);
+                chunk.setLightOn(false);
+                this.getLightEngine().lightChunk(chunk, emptySections);
                 chunk.setLightOn(true);
             } else {
-                this.getLightEngine().loadInChunk(chunkPos.x, chunkPos.z, emptySections);
+                this.getLightEngine().forceLoadInChunk(chunk, emptySections);
+                // can't really force the chunk to be edged checked, as we need neighbouring chunks - but we don't have
+                // them, so if it's not loaded then i guess we can't do edge checks. later loads of the chunk should
+                // catch what we miss here.
+                this.getLightEngine().checkChunkEdges(chunkPos.x, chunkPos.z);
             }
 
             this.chunkStorage.releaseLightTicket(chunkPos);

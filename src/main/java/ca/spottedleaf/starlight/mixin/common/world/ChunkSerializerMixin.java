@@ -23,7 +23,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ChunkSerializer.class)
 public abstract class ChunkSerializerMixin {
 
-    private static final int STARLIGHT_LIGHT_VERSION = 3;
+    private static final int STARLIGHT_LIGHT_VERSION = 4;
 
     private static final String UNINITIALISED_SKYLIGHT_TAG = "starlight.skylight_uninit";
     private static final String STARLIGHT_VERSION_TAG = "starlight.light_version";

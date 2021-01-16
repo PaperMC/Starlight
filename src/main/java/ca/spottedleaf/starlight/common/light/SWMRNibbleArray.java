@@ -67,13 +67,21 @@ public final class SWMRNibbleArray {
 
     // operation type: visible
     public boolean isAllZero() {
-        final byte[] bytes = this.storageVisible;
+        final int state = this.stateVisible;
 
-        if (this.storageVisible == null) {
+        if (state == INIT_STATE_NULL) {
+            return false;
+        } else if (state == INIT_STATE_UNINIT) {
             return true;
         }
 
         synchronized (this) {
+            final byte[] bytes = this.storageVisible;
+
+            if (bytes == null) {
+                return this.stateVisible == INIT_STATE_UNINIT;
+            }
+
             for (int i = 0; i < (ARRAY_SIZE >>> 4); ++i) {
                 byte whole = bytes[i << 4];
 

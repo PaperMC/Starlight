@@ -2,9 +2,12 @@ package ca.spottedleaf.starlight.common.light;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
+import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import net.minecraft.block.BlockState;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkProvider;
@@ -91,6 +94,83 @@ public final class BlockStarLightEngine extends StarLightEngine {
                         // catch that and fix it.
         );
         // re-propagating neighbours (done by the decrease queue) will also account for opacity changes in this block
+    }
+
+    protected final BlockPos.Mutable recalcCenterPos = new BlockPos.Mutable();
+    protected final BlockPos.Mutable recalcNeighbourPos = new BlockPos.Mutable();
+
+    @Override
+    protected int calculateLightValue(final ChunkProvider lightAccess, final int worldX, final int worldY, final int worldZ,
+                                      final int expect, final VariableBlockLightHandler customBlockLight) {
+        final BlockState centerState = this.getBlockState(worldX, worldY, worldZ);
+        int level = centerState.getLuminance() & 0xFF;
+        if (customBlockLight != null) {
+            level = this.getCustomLightLevel(customBlockLight, worldX, worldY, worldZ, level);
+        }
+
+        if (level >= (15 - 1) || level > expect) {
+            return level;
+        }
+
+        final int sectionOffset = this.chunkSectionIndexOffset;
+        final BlockState conditionallyOpaqueState;
+        int opacity = ((ExtendedAbstractBlockState)centerState).getOpacityIfCached();
+
+        if (opacity == -1) {
+            this.recalcCenterPos.set(worldX, worldY, worldZ);
+            opacity = centerState.getOpacity(lightAccess.getWorld(), this.recalcCenterPos);
+            if (((ExtendedAbstractBlockState)centerState).isConditionallyFullOpaque()) {
+                conditionallyOpaqueState = centerState;
+            } else {
+                conditionallyOpaqueState = null;
+            }
+        } else if (opacity >= 15) {
+            return level;
+        } else {
+            conditionallyOpaqueState = null;
+        }
+        opacity = Math.max(1, opacity);
+
+        for (final AxisDirection direction : AXIS_DIRECTIONS) {
+            final int offX = worldX + direction.x;
+            final int offY = worldY + direction.y;
+            final int offZ = worldZ + direction.z;
+
+            final int sectionIndex = (offX >> 4) + 5 * (offZ >> 4) + (5 * 5) * (offY >> 4) + sectionOffset;
+
+            final int neighbourLevel = this.getLightLevel(sectionIndex, (offX & 15) | ((offZ & 15) << 4) | ((offY & 15) << 8));
+
+            if ((neighbourLevel - 1) <= level) {
+                // don't need to test transparency, we know it wont affect the result.
+                continue;
+            }
+
+            final long neighbourOpacity = this.getKnownTransparency(sectionIndex, (offY & 15) | ((offX & 15) << 4) | ((offZ & 15) << 8));
+
+            if (neighbourOpacity == ExtendedChunkSection.BLOCK_SPECIAL_TRANSPARENCY) {
+                // here the block can be conditionally opaque (i.e light cannot propagate from it), so we need to test that
+                // we don't read the blockstate because most of the time this is false, so using the faster
+                // known transparency lookup results in a net win
+                final BlockState neighbourState = this.getBlockState(offX, offY, offZ);
+                this.recalcNeighbourPos.set(offX, offY, offZ);
+                final VoxelShape neighbourFace = neighbourState.getCullingFace(lightAccess.getWorld(), this.recalcNeighbourPos, direction.opposite.nms);
+                final VoxelShape thisFace = conditionallyOpaqueState == null ? VoxelShapes.empty() : conditionallyOpaqueState.getCullingFace(lightAccess.getWorld(), this.recalcCenterPos, direction.nms);
+                if (VoxelShapes.unionCoversFullCube(thisFace, neighbourFace)) {
+                    // not allowed to propagate
+                    continue;
+                }
+            }
+
+            // passed transparency,
+
+            final int calculated = neighbourLevel - opacity;
+            level = Math.max(calculated, level);
+            if (level > expect) {
+                return level;
+            }
+        }
+
+        return level;
     }
 
     @Override
