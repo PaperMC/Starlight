@@ -5,6 +5,7 @@ import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import net.minecraft.block.Block;
 import net.minecraft.fluid.Fluid;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.TickScheduler;
 import net.minecraft.world.World;
@@ -68,10 +69,11 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
      * TODO since this is a constructor inject, check for new constructors on update.
      */
     @Inject(
-            method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ProtoChunk;)V",
+            method = "<init>(Lnet/minecraft/server/world/ServerWorld;Lnet/minecraft/world/chunk/ProtoChunk;Ljava/util/function/Consumer;)V",
             at = @At("TAIL")
     )
-    public void onTransitionToFull(final World world, final ProtoChunk protoChunk, final CallbackInfo ci) {
+    public void onTransitionToFull(final ServerWorld serverWorld, final ProtoChunk protoChunk, final Consumer<WorldChunk> consumer,
+                                   final CallbackInfo ci) {
         this.setBlockNibbles(((ExtendedChunk)protoChunk).getBlockNibbles());
         this.setSkyNibbles(((ExtendedChunk)protoChunk).getSkyNibbles());
         this.setEmptinessMap(((ExtendedChunk)protoChunk).getEmptinessMap());

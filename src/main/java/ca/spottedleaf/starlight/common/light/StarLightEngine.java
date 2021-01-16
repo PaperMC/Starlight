@@ -18,6 +18,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.shape.VoxelShape;
 import net.minecraft.util.shape.VoxelShapes;
 import net.minecraft.world.BlockView;
+import net.minecraft.world.HeightLimitView;
 import net.minecraft.world.LightType;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
@@ -416,15 +417,7 @@ public abstract class StarLightEngine {
         return ExtendedChunkSection.BLOCK_IS_TRANSPARENT;
     }
 
-    /**
-     * @deprecated To be removed in 1.17 due to variable section count
-     */
-    @Deprecated
-    public static SWMRNibbleArray[] getFilledEmptyLight() {
-        return getFilledEmptyLight(16 - (-1) + 1);
-    }
-
-    public static SWMRNibbleArray[] getFilledEmptyLight(final World world) {
+    public static SWMRNibbleArray[] getFilledEmptyLight(final HeightLimitView world) {
         return getFilledEmptyLight(WorldUtil.getTotalLightSections(world));
     }
 

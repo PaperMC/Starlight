@@ -13,15 +13,12 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(ReadOnlyChunk.class)
-public abstract class ReadOnlyChunkMixin extends ProtoChunk implements Chunk, ExtendedChunk {
+public abstract class ReadOnlyChunkMixin /*extends ProtoChunk*/ implements Chunk, ExtendedChunk {
+    // TODO fix extends later, it appears due to some bad mappings we can't extend.
 
     @Final
     @Shadow
     private WorldChunk wrapped;
-
-    public ReadOnlyChunkMixin(final ChunkPos pos, final UpgradeData upgradeData) {
-        super(pos, upgradeData);
-    }
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {

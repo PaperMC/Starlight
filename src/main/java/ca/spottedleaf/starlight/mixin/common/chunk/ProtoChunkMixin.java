@@ -7,6 +7,7 @@ import net.minecraft.block.Block;
 import net.minecraft.fluid.Fluid;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.ChunkTickScheduler;
+import net.minecraft.world.HeightLimitView;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkSection;
 import net.minecraft.world.chunk.ProtoChunk;
@@ -64,12 +65,13 @@ public abstract class ProtoChunkMixin implements Chunk, ExtendedChunk {
      * TODO since this is a constructor inject, check for new constructors on update.
      */
     @Inject(
-            method = "<init>(Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/world/chunk/UpgradeData;[Lnet/minecraft/world/chunk/ChunkSection;Lnet/minecraft/world/ChunkTickScheduler;Lnet/minecraft/world/ChunkTickScheduler;)V",
+            method = "<init>(Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/world/chunk/UpgradeData;[Lnet/minecraft/world/chunk/ChunkSection;Lnet/minecraft/world/ChunkTickScheduler;Lnet/minecraft/world/ChunkTickScheduler;Lnet/minecraft/world/HeightLimitView;)V",
             at = @At("TAIL")
     )
-    public void onConstruct(final ChunkPos pos, final UpgradeData upgradeData, final ChunkSection[] sections, final ChunkTickScheduler<Block> blockTickScheduler,
-                            final ChunkTickScheduler<Fluid> fluidTickScheduler, final CallbackInfo ci) {
-        this.blockNibbles = StarLightEngine.getFilledEmptyLight();
-        this.skyNibbles = StarLightEngine.getFilledEmptyLight();
+    public void onConstruct(final ChunkPos pos, final UpgradeData upgradeData, final ChunkSection[] chunkSections,
+                            final ChunkTickScheduler<Block> blockTickScheduler, final ChunkTickScheduler<Fluid> fluidTickScheduler,
+                            final HeightLimitView heightLimitView, final CallbackInfo ci) {
+        this.blockNibbles = StarLightEngine.getFilledEmptyLight(heightLimitView);
+        this.skyNibbles = StarLightEngine.getFilledEmptyLight(heightLimitView);
     }
 }
