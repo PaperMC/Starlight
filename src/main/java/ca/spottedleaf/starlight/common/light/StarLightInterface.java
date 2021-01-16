@@ -27,7 +27,7 @@ import java.util.function.IntConsumer;
 
 public final class StarLightInterface {
 
-    public static final TicketType<Long> CHUNK_WORK_TICKET = TicketType.create("starlight_chunk_work_ticket", Long::compareTo);
+    public static final TicketType<ChunkPos> CHUNK_WORK_TICKET = TicketType.create("starlight_chunk_work_ticket", (p1, p2) -> Long.compare(p1.asLong(), p2.asLong()));
 
     /**
      * Can be {@code null}, indicating the light is all empty.
@@ -322,6 +322,23 @@ public final class StarLightInterface {
         }
     }
 
+    public void forceLoadInChunk(final IChunk chunk, final Boolean[] emptySections) {
+        final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
+        final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
+
+        try {
+            if (skyEngine != null) {
+                skyEngine.forceHandleEmptySectionChanges(this.lightAccess, chunk, emptySections);
+            }
+            if (blockEngine != null) {
+                blockEngine.forceHandleEmptySectionChanges(this.lightAccess, chunk, emptySections);
+            }
+        } finally {
+            this.releaseSkyLightEngine(skyEngine);
+            this.releaseBlockLightEngine(blockEngine);
+        }
+    }
+
     public void loadInChunk(final int chunkX, final int chunkZ, final Boolean[] emptySections) {
         final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
         final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
@@ -339,16 +356,16 @@ public final class StarLightInterface {
         }
     }
 
-    public void lightChunk(final int chunkX, final int chunkZ, final Boolean[] emptySections) {
+    public void lightChunk(final IChunk chunk, final Boolean[] emptySections) {
         final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
         final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
 
         try {
             if (skyEngine != null) {
-                skyEngine.light(this.lightAccess, chunkX, chunkZ, emptySections);
+                skyEngine.light(this.lightAccess, chunk, emptySections);
             }
             if (blockEngine != null) {
-                blockEngine.light(this.lightAccess, chunkX, chunkZ, emptySections);
+                blockEngine.light(this.lightAccess, chunk, emptySections);
             }
         } finally {
             this.releaseSkyLightEngine(skyEngine);

@@ -27,7 +27,7 @@ public abstract class ChunkSectionMixin implements ExtendedChunkSection {
     protected int transparentBlockCount;
 
     @Unique
-    private final long[] knownBlockTransparencies = new long[16 * 16 * 16 / Long.SIZE]; // blocks * bits per block / bits per long
+    private final long[] knownBlockTransparencies = new long[16 * 16 * 16 * 2 / Long.SIZE]; // blocks * bits per block / bits per long
 
     @Unique
     private static long getKnownTransparency(final BlockState state) {
@@ -36,19 +36,22 @@ public abstract class ChunkSectionMixin implements ExtendedChunkSection {
         if (opacityIfCached == 0) {
             return ExtendedChunkSection.BLOCK_IS_TRANSPARENT;
         }
+        if (opacityIfCached == 15) {
+            return ExtendedChunkSection.BLOCK_IS_FULL_OPAQUE;
+        }
 
-        return ExtendedChunkSection.BLOCK_UNKNOWN_TRANSPARENCY;
+        return opacityIfCached == -1 ? ExtendedChunkSection.BLOCK_SPECIAL_TRANSPARENCY : ExtendedChunkSection.BLOCK_UNKNOWN_TRANSPARENCY;
     }
 
     /* NOTE: Index is y | (x << 4) | (z << 8) */
     @Unique
     private void updateTransparencyInfo(final int blockIndex, final long transparency) {
-        final int arrayIndex = (blockIndex >>> 6); // blockIndex / 64
-        final int valueShift = (blockIndex & (Long.SIZE - 1));
+        final int arrayIndex = (blockIndex >>> (6 - 1)); // blockIndex / (64/2)
+        final int valueShift = (blockIndex & (Long.SIZE / 2 - 1)) << 1;
 
         long value = this.knownBlockTransparencies[arrayIndex];
 
-        value &= ~(0b1L << valueShift);
+        value &= ~(0b11L << valueShift);
         value |= (transparency << valueShift);
 
         this.knownBlockTransparencies[arrayIndex] = value;
@@ -126,12 +129,12 @@ public abstract class ChunkSectionMixin implements ExtendedChunkSection {
     @Override
     public final long getKnownTransparency(final int blockIndex) {
         // index = y | (x << 4) | (z << 8)
-        final int arrayIndex = (blockIndex >>> 6); // blockIndex / 64
-        final int valueShift = (blockIndex & (Long.SIZE - 1));
+        final int arrayIndex = (blockIndex >>> (6 - 1)); // blockIndex / (64/2)
+        final int valueShift = (blockIndex & (Long.SIZE / 2 - 1)) << 1;
 
         final long value = this.knownBlockTransparencies[arrayIndex];
 
-        return (value >>> valueShift) & 0b1L;
+        return (value >>> valueShift) & 0b11L;
     }
 
 
@@ -139,10 +142,10 @@ public abstract class ChunkSectionMixin implements ExtendedChunkSection {
     public final long getBitsetForColumn(final int columnX, final int columnZ) {
         // index = y | (x << 4) | (z << 8)
         final int columnIndex = (columnX << 4) | (columnZ << 8);
-        final long value = this.knownBlockTransparencies[columnIndex >>> 6]; // columnIndex / 64
+        final long value = this.knownBlockTransparencies[columnIndex >>> (6 - 1)]; // columnIndex / (64/2)
 
-        final int startIndex = (columnIndex & (Long.SIZE - 1));
+        final int startIndex = (columnIndex & (Long.SIZE / 2 - 1)) << 1;
 
-        return (value >>> startIndex) & ((1L << 16) - 1);
+        return (value >>> startIndex) & ((1L << (16 * 2)) - 1);
     }
 }

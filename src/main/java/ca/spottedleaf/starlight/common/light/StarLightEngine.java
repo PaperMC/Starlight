@@ -1,6 +1,7 @@
 package ca.spottedleaf.starlight.common.light;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
+import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.util.IntegerUtil;
 import ca.spottedleaf.starlight.common.util.WorldUtil;
@@ -393,6 +394,28 @@ public abstract class StarLightEngine {
         return ret == -1 ? dfl : ret;
     }
 
+    protected final long getKnownTransparency(final int worldX, final int worldY, final int worldZ) {
+        final ChunkSection section = this.sectionCache[(worldX >> 4) + 5 * (worldZ >> 4) + (5 * 5) * (worldY >> 4) + this.chunkSectionIndexOffset];
+
+        if (section != null) {
+            return section == EMPTY_CHUNK_SECTION ? ExtendedChunkSection.BLOCK_IS_TRANSPARENT :
+                    ((ExtendedChunkSection)section).getKnownTransparency((worldY & 15) | ((worldX & 15) << 4) | ((worldZ & 15) << 8));
+        }
+
+        return ExtendedChunkSection.BLOCK_IS_TRANSPARENT;
+    }
+
+    // warn: localIndex = y | (x << 4) | (z << 8)
+    protected final long getKnownTransparency(final int sectionIndex, final int localIndex) {
+        final ChunkSection section = this.sectionCache[sectionIndex];
+
+        if (section != null) {
+            return section == EMPTY_CHUNK_SECTION ? ExtendedChunkSection.BLOCK_IS_TRANSPARENT : ((ExtendedChunkSection)section).getKnownTransparency(localIndex);
+        }
+
+        return ExtendedChunkSection.BLOCK_IS_TRANSPARENT;
+    }
+
     /**
      * @deprecated To be removed in 1.17 due to variable section count
      */
@@ -427,7 +450,7 @@ public abstract class StarLightEngine {
 
     public final void blocksChangedInChunk(final IChunkLightProvider lightAccess, final int chunkX, final int chunkZ,
                                            final Set<BlockPos> positions, final Boolean[] changedSections) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, this.isClientSide, true);
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, true);
         try {
             final IChunk chunk = this.getChunkInCache(chunkX, chunkZ);
             if (this.isClientSide && chunk == null) {
@@ -454,6 +477,15 @@ public abstract class StarLightEngine {
 
     protected abstract void checkBlock(final IChunkLightProvider lightAccess, final int worldX, final int worldY, final int worldZ);
 
+    // if ret > expect, then the real value is at least ret (early returns if ret > expect, rather than calculating actual)
+    // if ret == expect, then expect is the correct light value for pos
+    // if ret < expect, then ret is the real light value
+    protected abstract int calculateLightValue(final IChunkLightProvider lightAccess, final int worldX, final int worldY, final int worldZ,
+                                               final int expect, final VariableBlockLightHandler customBlockLight);
+
+    protected final int[] chunkCheckDelayedUpdatesCenter = new int[16 * 16];
+    protected final int[] chunkCheckDelayedUpdatesNeighbour = new int[16 * 16];
+
     protected void checkChunkEdge(final IChunkLightProvider lightAccess, final IChunk chunk,
                                   final int chunkX, final int chunkY, final int chunkZ) {
         final SWMRNibbleArray currNibble = this.getNibbleFromCache(chunkX, chunkY, chunkZ);
@@ -477,6 +509,7 @@ public abstract class StarLightEngine {
                 continue;
             }
 
+            // this chunk
             final int incX;
             final int incZ;
             final int startX;
@@ -508,41 +541,58 @@ public abstract class StarLightEngine {
                 startX = chunkX << 4;
             }
 
+            final VariableBlockLightHandler customLightHandler = ((ExtendedWorld)lightAccess.getWorld()).getCustomLightHandler();
+            int centerDelayedChecks = 0;
+            int neighbourDelayedChecks = 0;
             for (int currY = chunkY << 4, maxY = currY | 15; currY <= maxY; ++currY) {
                 for (int i = 0, currX = startX, currZ = startZ; i < 16; ++i, currX += incX, currZ += incZ) {
                     final int neighbourX = currX + neighbourOffX;
                     final int neighbourZ = currZ + neighbourOffZ;
 
-                    final int currentLevel = currNibble.getUpdating((currX & 15) |
+                    final int currentIndex = (currX & 15) |
                             ((currZ & 15)) << 4 |
-                            ((currY & 15) << 8)
-                    );
-                    final int neighbourLevel = neighbourNibble.getUpdating((neighbourX & 15) |
+                            ((currY & 15) << 8);
+                    final int currentLevel = currNibble.getUpdating(currentIndex);
+
+                    final int neighbourIndex =
+                            (neighbourX & 15) |
                             ((neighbourZ & 15)) << 4 |
-                            ((currY & 15) << 8)
-                    );
+                            ((currY & 15) << 8);
+                    final int neighbourLevel = neighbourNibble.getUpdating(neighbourIndex);
 
-                    if (currentLevel == neighbourLevel && (currentLevel == 0 || currentLevel == 15)) {
-                        // nothing to check here
-                        continue;
+                    // the checks are delayed because the checkBlock method clobbers light values - which then
+                    // affect later calculate light value operations. While they don't affect it in a behaviourly significant
+                    // way, they do have a negative performance impact due to simply queueing more values
+
+                    if (this.calculateLightValue(lightAccess, currX, currY, currZ, currentLevel, customLightHandler) != currentLevel) {
+                        this.chunkCheckDelayedUpdatesCenter[centerDelayedChecks++] = currentIndex;
                     }
 
-                    if (Math.abs(currentLevel - neighbourLevel) == 1) {
-                        final BlockState currentBlock = this.getBlockState(currX, currY, currZ);
-                        final BlockState neighbourBlock = this.getBlockState(neighbourX, currY, neighbourZ);
-
-                        final int currentOpacity = ((ExtendedAbstractBlockState)currentBlock).getOpacityIfCached();
-                        final int neighbourOpacity = ((ExtendedAbstractBlockState)neighbourBlock).getOpacityIfCached();
-                        if (currentOpacity == 0 || currentOpacity == 1 ||
-                                neighbourOpacity == 0 || neighbourOpacity == 1) {
-                            // looks good
-                            continue;
-                        }
+                    if (this.calculateLightValue(lightAccess, neighbourX, currY, neighbourZ, neighbourLevel, customLightHandler) != neighbourLevel) {
+                        this.chunkCheckDelayedUpdatesNeighbour[neighbourDelayedChecks++] = neighbourIndex;
                     }
+                }
+            }
 
-                    // setup queue, it looks like something could be inconsistent
-                    this.checkBlock(lightAccess, currX, currY, currZ);
-                    this.checkBlock(lightAccess, neighbourX, currY, neighbourZ);
+            final int currentChunkOffX = chunkX << 4;
+            final int currentChunkOffZ = chunkZ << 4;
+            final int neighbourChunkOffX = (chunkX + direction.x) << 4;
+            final int neighbourChunkOffZ = (chunkZ + direction.z) << 4;
+            final int chunkOffY = chunkY << 4;
+            for (int i = 0, len = Math.max(centerDelayedChecks, neighbourDelayedChecks); i < len; ++i) {
+                // try to queue neighbouring data together
+                // index = x | (z << 4) | (y << 8)
+                if (i < centerDelayedChecks) {
+                    final int value = this.chunkCheckDelayedUpdatesCenter[i];
+                    this.checkBlock(lightAccess, currentChunkOffX | (value & 15),
+                            chunkOffY | (value >>> 8),
+                            currentChunkOffZ | ((value >>> 4) & 0xF));
+                }
+                if (i < neighbourDelayedChecks) {
+                    final int value = this.chunkCheckDelayedUpdatesNeighbour[i];
+                    this.checkBlock(lightAccess, neighbourChunkOffX | (value & 15),
+                            chunkOffY | (value >>> 8),
+                            neighbourChunkOffZ | ((value >>> 4) & 0xF));
                 }
             }
         }
@@ -600,6 +650,7 @@ public abstract class StarLightEngine {
                     continue;
                 }
 
+                // neighbour chunk
                 final int incX;
                 final int incZ;
                 final int startX;
@@ -674,22 +725,43 @@ public abstract class StarLightEngine {
         return ret;
     }
 
-    public final void handleEmptySectionChanges(final IChunkLightProvider lightAccess, final int chunkX, final int chunkZ,
-                                                final Boolean[] emptinessChanges) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, this.isClientSide, true);
-        if (this.isClientSide) {
+    public final void forceHandleEmptySectionChanges(final IChunkLightProvider lightAccess, final IChunk chunk, final Boolean[] emptinessChanges) {
+        final int chunkX = chunk.getPos().x;
+        final int chunkZ = chunk.getPos().z;
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, true);
+        try {
             // force current chunk into cache
-            final IChunk chunk =  (IChunk)lightAccess.getChunkForLight(chunkX, chunkZ);
-            if (chunk == null) {
-                // unloaded this frame (or last), and we were still queued
-                return;
-            }
             this.setChunkInCache(chunkX, chunkZ, chunk);
             this.setBlocksForChunkInCache(chunkX, chunkZ, chunk.getSections());
             this.setNibblesForChunkInCache(chunkX, chunkZ, this.getNibblesOnChunk(chunk));
             this.setEmptinessMapCache(chunkX, chunkZ, this.getEmptinessMap(chunk));
+
+            final boolean[] ret = this.handleEmptySectionChanges(lightAccess, chunk, emptinessChanges, false);
+            if (ret != null) {
+                this.setEmptinessMap(chunk, ret);
+            }
+            this.updateVisible(lightAccess);
+        } finally {
+            this.destroyCaches();
         }
+    }
+
+    public final void handleEmptySectionChanges(final IChunkLightProvider lightAccess, final int chunkX, final int chunkZ,
+                                                final Boolean[] emptinessChanges) {
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, true);
         try {
+            if (this.isClientSide) {
+                // force current chunk into cache
+                final IChunk chunk =  (IChunk)lightAccess.getChunkForLight(chunkX, chunkZ);
+                if (chunk == null) {
+                    // unloaded this frame (or last), and we were still queued
+                    return;
+                }
+                this.setChunkInCache(chunkX, chunkZ, chunk);
+                this.setBlocksForChunkInCache(chunkX, chunkZ, chunk.getSections());
+                this.setNibblesForChunkInCache(chunkX, chunkZ, this.getNibblesOnChunk(chunk));
+                this.setEmptinessMapCache(chunkX, chunkZ, this.getEmptinessMap(chunk));
+            }
             final IChunk chunk = this.getChunkInCache(chunkX, chunkZ);
             if (chunk == null) {
                 return;
@@ -719,7 +791,7 @@ public abstract class StarLightEngine {
             if (chunk == null) {
                 return;
             }
-            this.checkChunkEdges(lightAccess, chunk, -1, 16);
+            this.checkChunkEdges(lightAccess, chunk, this.minLightSection, this.maxLightSection);
             this.updateVisible(lightAccess);
         } finally {
             this.destroyCaches();
@@ -748,21 +820,25 @@ public abstract class StarLightEngine {
     // does not need to detect empty chunks itself (and it should do no handling for them either!)
     protected abstract void lightChunk(final IChunkLightProvider lightAccess, final IChunk chunk, final boolean needsEdgeChecks);
 
-    public final void light(final IChunkLightProvider lightAccess, final int chunkX, final int chunkZ, final Boolean[] emptySections) {
-        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, false, true);
-        // force current chunk into cache
-        final IChunk chunk =  (IChunk)lightAccess.getChunkForLight(chunkX, chunkZ);
-        this.setChunkInCache(chunkX, chunkZ, chunk);
-        this.setBlocksForChunkInCache(chunkX, chunkZ, chunk.getSections());
-        this.setNibblesForChunkInCache(chunkX, chunkZ, this.getNibblesOnChunk(chunk));
-        this.setEmptinessMapCache(chunkX, chunkZ, this.getEmptinessMap(chunk));
+    public final void light(final IChunkLightProvider lightAccess, final IChunk chunk, final Boolean[] emptySections) {
+        final int chunkX = chunk.getPos().x;
+        final int chunkZ = chunk.getPos().z;
+        this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, true);
 
         try {
+            final SWMRNibbleArray[] nibbles = getFilledEmptyLight(this.maxLightSection - this.minLightSection + 1);
+            // force current chunk into cache
+            this.setChunkInCache(chunkX, chunkZ, chunk);
+            this.setBlocksForChunkInCache(chunkX, chunkZ, chunk.getSections());
+            this.setNibblesForChunkInCache(chunkX, chunkZ, nibbles);
+            this.setEmptinessMapCache(chunkX, chunkZ, this.getEmptinessMap(chunk));
+
             final boolean[] ret = this.handleEmptySectionChanges(lightAccess, chunk, emptySections, true);
             if (ret != null) {
                 this.setEmptinessMap(chunk, ret);
             }
-            this.lightChunk(lightAccess, chunk, false);
+            this.lightChunk(lightAccess, chunk, true); // TODO
+            this.setNibbles(chunk, nibbles);
             this.updateVisible(lightAccess);
         } finally {
             this.destroyCaches();
