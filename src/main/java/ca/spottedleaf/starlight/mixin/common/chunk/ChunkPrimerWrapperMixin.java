@@ -44,12 +44,22 @@ public abstract class ChunkPrimerWrapperMixin extends ChunkPrimer implements ICh
     }
 
     @Override
-    public boolean[] getEmptinessMap() {
-        return ((ExtendedChunk)this.chunk).getEmptinessMap();
+    public boolean[] getSkyEmptinessMap() {
+        return ((ExtendedChunk)this.chunk).getSkyEmptinessMap();
     }
 
     @Override
-    public void setEmptinessMap(final boolean[] emptinessMap) {
-        ((ExtendedChunk)this.chunk).setEmptinessMap(emptinessMap);
+    public void setSkyEmptinessMap(final boolean[] emptinessMap) {
+        ((ExtendedChunk)this.chunk).setSkyEmptinessMap(emptinessMap);
+    }
+
+    @Override
+    public boolean[] getBlockEmptinessMap() {
+        return ((ExtendedChunk)this.chunk).getBlockEmptinessMap();
+    }
+
+    @Override
+    public void setBlockEmptinessMap(final boolean[] emptinessMap) {
+        ((ExtendedChunk)this.chunk).setBlockEmptinessMap(emptinessMap);
     }
 }

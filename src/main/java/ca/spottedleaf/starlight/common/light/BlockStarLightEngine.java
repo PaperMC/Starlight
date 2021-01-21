@@ -30,11 +30,13 @@ public final class BlockStarLightEngine extends StarLightEngine {
 
     @Override
     protected boolean[] getEmptinessMap(final IChunk chunk) {
-        return null;
+        return ((ExtendedChunk)chunk).getBlockEmptinessMap();
     }
 
     @Override
-    protected void setEmptinessMap(final IChunk chunk, final boolean[] to) {}
+    protected void setEmptinessMap(final IChunk chunk, final boolean[] to) {
+        ((ExtendedChunk)chunk).setBlockEmptinessMap(to);
+    }
 
     @Override
     protected SWMRNibbleArray[] getNibblesOnChunk(final IChunk chunk) {
@@ -52,9 +54,21 @@ public final class BlockStarLightEngine extends StarLightEngine {
     }
 
     @Override
-    protected boolean[] handleEmptySectionChanges(final IChunkLightProvider lightAccess, final IChunk chunk,
-                                                  final Boolean[] emptinessChanges, final boolean unlit) {
-        return null;
+    protected void initNibble(final int chunkX, final int chunkY, final int chunkZ, final boolean extrude, final boolean initRemovedNibbles) {
+        if (chunkY < this.minLightSection || chunkY > this.maxLightSection || this.getChunkInCache(chunkX, chunkZ) == null) {
+            return;
+        }
+
+        SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, chunkY, chunkZ);
+        if (nibble == null) {
+            if (!initRemovedNibbles) {
+                throw new IllegalStateException();
+            } else {
+                this.setNibbleInCache(chunkX, chunkY, chunkZ, new SWMRNibbleArray());
+            }
+        } else {
+            nibble.setNonNull();
+        }
     }
 
     @Override
