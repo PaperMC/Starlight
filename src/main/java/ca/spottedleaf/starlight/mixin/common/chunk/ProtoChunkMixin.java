@@ -28,7 +28,10 @@ public abstract class ProtoChunkMixin implements Chunk, ExtendedChunk {
     private volatile SWMRNibbleArray[] skyNibbles;
 
     @Unique
-    private volatile boolean[] emptinessMap;
+    private volatile boolean[] skyEmptinessMap;
+
+    @Unique
+    private volatile boolean[] blockEmptinessMap;
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {
@@ -51,13 +54,23 @@ public abstract class ProtoChunkMixin implements Chunk, ExtendedChunk {
     }
 
     @Override
-    public boolean[] getEmptinessMap() {
-        return this.emptinessMap;
+    public boolean[] getSkyEmptinessMap() {
+        return this.skyEmptinessMap;
     }
 
     @Override
-    public void setEmptinessMap(final boolean[] emptinessMap) {
-        this.emptinessMap = emptinessMap;
+    public void setSkyEmptinessMap(final boolean[] emptinessMap) {
+        this.skyEmptinessMap = emptinessMap;
+    }
+
+    @Override
+    public boolean[] getBlockEmptinessMap() {
+        return this.blockEmptinessMap;
+    }
+
+    @Override
+    public void setBlockEmptinessMap(final boolean[] emptinessMap) {
+        this.blockEmptinessMap = emptinessMap;
     }
 
     /**

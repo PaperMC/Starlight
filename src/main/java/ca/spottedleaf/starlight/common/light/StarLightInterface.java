@@ -80,7 +80,7 @@ public final class StarLightInterface {
                     return null;
                 }
 
-                if (((ExtendedChunk)chunk).getEmptinessMap() == null) {
+                if (((ExtendedChunk)chunk).getSkyEmptinessMap() == null) {
                     return null;
                 }
 
@@ -122,7 +122,7 @@ public final class StarLightInterface {
                     }
                 }
 
-                final boolean[] emptinessMap = ((ExtendedChunk)chunk).getEmptinessMap();
+                final boolean[] emptinessMap = ((ExtendedChunk)chunk).getSkyEmptinessMap();
 
                 if (emptinessMap == null) {
                     return 15;

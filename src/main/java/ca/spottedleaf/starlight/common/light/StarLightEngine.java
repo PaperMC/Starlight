@@ -769,13 +769,132 @@ public abstract class StarLightEngine {
         }
     }
 
+    protected abstract void initNibble(final int chunkX, final int chunkY, final int chunkZ, final boolean extrude, final boolean initRemovedNibbles);
+
     // subclasses should not initialise caches, as this will always be done by the super call
     // subclasses should not invoke updateVisible, as this will always be done by the super call
     // subclasses are guaranteed that this is always called before a changed block set
     // newChunk specifies whether the changes describe a "first load" of a chunk or changes to existing, already loaded chunks
     // rets non-null when the emptiness map changed and needs to be updated
-    protected abstract boolean[] handleEmptySectionChanges(final ChunkProvider lightAccess, final Chunk chunk,
-                                                           final Boolean[] emptinessChanges, final boolean unlit);
+    protected final boolean[] handleEmptySectionChanges(final ChunkProvider lightAccess, final Chunk chunk,
+                                                        final Boolean[] emptinessChanges, final boolean unlit) {
+        final World world = (World)lightAccess.getWorld();
+        final int chunkX = chunk.getPos().x;
+        final int chunkZ = chunk.getPos().z;
+
+        boolean[] chunkEmptinessMap = this.getEmptinessMap(chunkX, chunkZ);
+        boolean[] ret = null;
+        final boolean needsInit = unlit || chunkEmptinessMap == null;
+        if (needsInit) {
+            this.setEmptinessMapCache(chunkX, chunkZ, ret = chunkEmptinessMap = new boolean[WorldUtil.getTotalSections(world)]);
+        }
+
+        // update emptiness map
+        for (int sectionIndex = (emptinessChanges.length - 1); sectionIndex >= 0; --sectionIndex) {
+            final Boolean valueBoxed = emptinessChanges[sectionIndex];
+            if (valueBoxed == null) {
+                if (needsInit) {
+                    throw new IllegalStateException("Current chunk has not initialised emptiness map yet supplied emptiness map isn't filled?");
+                }
+                continue;
+            }
+            chunkEmptinessMap[sectionIndex] = valueBoxed.booleanValue();
+        }
+
+        // now init neighbour nibbles
+        for (int sectionIndex = (emptinessChanges.length - 1); sectionIndex >= 0; --sectionIndex) {
+            final Boolean valueBoxed = emptinessChanges[sectionIndex];
+            final int sectionY = sectionIndex + this.minSection;
+            if (valueBoxed == null) {
+                continue;
+            }
+
+            final boolean empty = valueBoxed.booleanValue();
+
+            if (empty) {
+                continue;
+            }
+
+            for (int dz = -1; dz <= 1; ++dz) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    // if we're not empty, we also need to initialise nibbles
+                    // note: if we're unlit, we absolutely do not want to extrude, as light data isn't set up
+                    final boolean extrude = (dx | dz) != 0 || !unlit;
+                    for (int dy = 1; dy >= -1; --dy) {
+                        this.initNibble(dx + chunkX, dy + sectionY, dz + chunkZ, extrude, false);
+                    }
+                }
+            }
+        }
+
+        // check for de-init and lazy-init
+        // lazy init is when chunks are being lit, so at the time they weren't loaded when their neighbours were running
+        // init checks.
+        for (int dz = -1; dz <= 1; ++dz) {
+            for (int dx = -1; dx <= 1; ++dx) {
+                // does this neighbour have 1 radius loaded?
+                boolean neighboursLoaded = true;
+                neighbour_loaded_search:
+                for (int dz2 = -1; dz2 <= 1; ++dz2) {
+                    for (int dx2 = -1; dx2 <= 1; ++dx2) {
+                        if (this.getEmptinessMap(dx + dx2 + chunkX, dz + dz2 + chunkZ) == null) {
+                            neighboursLoaded = false;
+                            break neighbour_loaded_search;
+                        }
+                    }
+                }
+
+                for (int sectionY = this.maxLightSection; sectionY >= this.minLightSection; --sectionY) {
+                    final SWMRNibbleArray nibble = this.getNibbleFromCache(dx + chunkX, sectionY, dz + chunkZ);
+
+                    // check neighbours to see if we need to de-init this one
+                    boolean allEmpty = true;
+                    neighbour_search:
+                    for (int dy2 = -1; dy2 <= 1; ++dy2) {
+                        for (int dz2 = -1; dz2 <= 1; ++dz2) {
+                            for (int dx2 = -1; dx2 <= 1; ++dx2) {
+                                final int y = sectionY + dy2;
+                                if (y < this.minSection || y > this.maxSection) {
+                                    // empty
+                                    continue;
+                                }
+                                final boolean[] emptinessMap = this.getEmptinessMap(dx + dx2 + chunkX, dz + dz2 + chunkZ);
+                                if (emptinessMap != null) {
+                                    if (!emptinessMap[y - this.minSection]) {
+                                        allEmpty = false;
+                                        break neighbour_search;
+                                    }
+                                } else {
+                                    final ChunkSection section = this.getChunkSection(dx + dx2 + chunkX, y, dz + dz2 + chunkZ);
+                                    if (section != null && section != EMPTY_CHUNK_SECTION) {
+                                        allEmpty = false;
+                                        break neighbour_search;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (allEmpty & neighboursLoaded) {
+                        // can only de-init when neighbours are loaded
+                        // de-init is fine to delay, as de-init is just an optimisation - it's not required for lighting
+                        // to be correct
+
+                        // all were empty, so de-init
+                        if (nibble != null) {
+                            nibble.setNull();
+                        }
+                    } else if (!allEmpty) {
+                        // must init
+                        final boolean extrude = (dx | dz) != 0 || !unlit;
+                        this.initNibble(dx + chunkX, sectionY, dz + chunkZ, extrude, false);
+                    }
+                }
+            }
+        }
+
+        return ret;
+    }
 
     public final void checkChunkEdges(final ChunkProvider lightAccess, final int chunkX, final int chunkZ) {
         this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, false);

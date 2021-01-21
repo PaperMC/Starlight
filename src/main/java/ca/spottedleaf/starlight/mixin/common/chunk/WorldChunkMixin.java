@@ -32,7 +32,10 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
     private volatile SWMRNibbleArray[] skyNibbles;
 
     @Unique
-    private volatile boolean[] emptinessMap;
+    private volatile boolean[] skyEmptinessMap;
+
+    @Unique
+    private volatile boolean[] blockEmptinessMap;
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {
@@ -55,13 +58,23 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
     }
 
     @Override
-    public boolean[] getEmptinessMap() {
-        return this.emptinessMap;
+    public boolean[] getSkyEmptinessMap() {
+        return this.skyEmptinessMap;
     }
 
     @Override
-    public void setEmptinessMap(final boolean[] emptinessMap) {
-        this.emptinessMap = emptinessMap;
+    public void setSkyEmptinessMap(final boolean[] emptinessMap) {
+        this.skyEmptinessMap = emptinessMap;
+    }
+
+    @Override
+    public boolean[] getBlockEmptinessMap() {
+        return this.blockEmptinessMap;
+    }
+
+    @Override
+    public void setBlockEmptinessMap(final boolean[] emptinessMap) {
+        this.blockEmptinessMap = emptinessMap;
     }
 
     /**
@@ -76,7 +89,8 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
                                    final CallbackInfo ci) {
         this.setBlockNibbles(((ExtendedChunk)protoChunk).getBlockNibbles());
         this.setSkyNibbles(((ExtendedChunk)protoChunk).getSkyNibbles());
-        this.setEmptinessMap(((ExtendedChunk)protoChunk).getEmptinessMap());
+        this.setSkyEmptinessMap(((ExtendedChunk)protoChunk).getSkyEmptinessMap());
+        this.setBlockEmptinessMap(((ExtendedChunk)protoChunk).getBlockEmptinessMap());
     }
 
     /**

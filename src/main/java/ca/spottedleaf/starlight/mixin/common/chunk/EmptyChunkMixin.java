@@ -37,10 +37,18 @@ public abstract class EmptyChunkMixin extends WorldChunk implements Chunk, Exten
     public void setSkyNibbles(final SWMRNibbleArray[] nibbles) {}
 
     @Override
-    public boolean[] getEmptinessMap() {
+    public boolean[] getSkyEmptinessMap() {
         return null;
     }
 
     @Override
-    public void setEmptinessMap(final boolean[] emptinessMap) {}
+    public void setSkyEmptinessMap(final boolean[] emptinessMap) {}
+
+    @Override
+    public boolean[] getBlockEmptinessMap() {
+        return null;
+    }
+
+    @Override
+    public void setBlockEmptinessMap(final boolean[] emptinessMap) {}
 }
