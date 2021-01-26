@@ -73,7 +73,11 @@ public abstract class ServerLightingProviderMixin extends LightingProvider imple
             world.getChunkManager().addTicket(StarLightInterface.CHUNK_WORK_TICKET, pos, 0, pos);
         }
 
-        this.enqueue(chunkX, chunkZ, ServerLightingProvider.Stage.PRE_UPDATE, () -> {
+        // yes it's rather silly we queue post update as this means two light runTasks() need to be called for runnable
+        // to actually take effect, but it's really the only way we can make chunk light calls prioritised vs
+        // block update calls. This fixes chunk loading/generating breaking when the server is under high stress
+        // from block updates.
+        this.enqueue(chunkX, chunkZ, ServerLightingProvider.Stage.POST_UPDATE, () -> {
             runnable.run();
             this.enqueue(chunkX, chunkZ, ServerLightingProvider.Stage.POST_UPDATE, () -> {
                 world.getChunkManager().threadedAnvilChunkStorage.mainThreadExecutor.execute(() -> {
