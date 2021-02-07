@@ -7,7 +7,10 @@
   "authors": [
     "Spottedleaf"
   ],
-  "contact": {},
+  "contact": {
+    "homepage": "https://github.com/Spottedleaf/Starlight",
+    "sources": "https://github.com/Spottedleaf/Starlight",
+    "issues": "https://github.com/Spottedleaf/Starlight/issues"},
   "license": "LGPL-3.0-only",
   "icon": "assets/starlight/icon.png",
   "environment": "*",
