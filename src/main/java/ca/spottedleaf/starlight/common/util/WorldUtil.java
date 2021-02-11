@@ -9,11 +9,11 @@ public final class WorldUtil {
     // actually verify with a debugger that they are returning what they say they are
 
     public static int getMaxSection(final HeightLimitView world) {
-        return world.getTopSectionLimit() - 1; // getTopSectionLimit() is exclusive
+        return world.getTopSectionCoord() - 1; // getTopSectionLimit() is exclusive
     }
 
     public static int getMinSection(final HeightLimitView world) {
-        return world.method_32891();
+        return world.getBottomSectionCoord();
     }
 
     public static int getMaxLightSection(final HeightLimitView world) {
