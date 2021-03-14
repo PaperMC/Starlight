@@ -7,6 +7,9 @@ Check out [The issues tab](https://github.com/Spottedleaf/Starlight/issues)
 Please note that since this is a beta, there could be some (severe) light corrupting issues. Do not use if you do not 
 want to take that risk!
 
+## Contact
+[Discord](https://discord.gg/tuinity)
+
 ## Results
 ![Starlight crushing all](https://i.imgur.com/6OcuyJX.png)
 - seed: `vanillakekw`
