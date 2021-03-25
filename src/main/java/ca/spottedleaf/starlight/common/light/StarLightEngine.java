@@ -102,7 +102,7 @@ public abstract class StarLightEngine {
     // index = x + (z * 5) + (y * 25)
     protected final boolean[] notifyUpdateCache;
 
-    // always initialsed during start of lighting. no index is null.
+    // always initialsed during start of lighting.
     // index = x + (z * 5)
     protected final IChunk[] chunkCache = new IChunk[5 * 5];
 
@@ -453,7 +453,7 @@ public abstract class StarLightEngine {
         this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, true);
         try {
             final IChunk chunk = this.getChunkInCache(chunkX, chunkZ);
-            if (this.isClientSide && chunk == null) {
+            if (chunk == null) {
                 return;
             }
             if (changedSections != null) {
@@ -750,18 +750,6 @@ public abstract class StarLightEngine {
                                                 final Boolean[] emptinessChanges) {
         this.setupCaches(lightAccess, chunkX * 16 + 7, 128, chunkZ * 16 + 7, true, true);
         try {
-            if (this.isClientSide) {
-                // force current chunk into cache
-                final IChunk chunk =  (IChunk)lightAccess.getChunkForLight(chunkX, chunkZ);
-                if (chunk == null) {
-                    // unloaded this frame (or last), and we were still queued
-                    return;
-                }
-                this.setChunkInCache(chunkX, chunkZ, chunk);
-                this.setBlocksForChunkInCache(chunkX, chunkZ, chunk.getSections());
-                this.setNibblesForChunkInCache(chunkX, chunkZ, this.getNibblesOnChunk(chunk));
-                this.setEmptinessMapCache(chunkX, chunkZ, this.getEmptinessMap(chunk));
-            }
             final IChunk chunk = this.getChunkInCache(chunkX, chunkZ);
             if (chunk == null) {
                 return;

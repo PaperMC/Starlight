@@ -14,6 +14,7 @@ import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.chunk.IChunkLightProvider;
 import net.minecraft.world.chunk.NibbleArray;
 import net.minecraft.world.lighting.WorldLightManager;
+import net.minecraft.world.server.ChunkHolder;
 import net.minecraft.world.server.ChunkManager;
 import net.minecraft.world.server.ServerWorld;
 import net.minecraft.world.server.ServerWorldLightManager;
@@ -24,6 +25,7 @@ import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 @Mixin(ServerWorldLightManager.class)
 public abstract class ServerWorldLightManagerMixin extends WorldLightManager implements StarLightLightingProvider {
@@ -37,7 +39,7 @@ public abstract class ServerWorldLightManagerMixin extends WorldLightManager imp
     private static Logger LOGGER;
 
     @Shadow
-    protected abstract void func_215586_a(final int x, final int z, final ServerWorldLightManager.Phase stage, final Runnable task); // enqueue
+    public abstract void func_215588_z_(); // tryScheduleUpdate
 
     public ServerWorldLightManagerMixin(final IChunkLightProvider chunkProvider, final boolean hasBlockLight, final boolean hasSkyLight) {
         super(chunkProvider, hasBlockLight, hasSkyLight);
@@ -47,7 +49,7 @@ public abstract class ServerWorldLightManagerMixin extends WorldLightManager imp
     private final Long2IntOpenHashMap chunksBeingWorkedOn = new Long2IntOpenHashMap();
 
     @Unique
-    private void queueTaskForSection(final int chunkX, final int chunkY, final int chunkZ, final Runnable runnable) {
+    private void queueTaskForSection(final int chunkX, final int chunkY, final int chunkZ, final Supplier<CompletableFuture<Void>> runnable) {
         final ServerWorld world = (ServerWorld)this.getLightEngine().getWorld();
 
         final IChunk center = this.getLightEngine().getAnyChunkNow(chunkX, chunkZ);
@@ -66,31 +68,46 @@ public abstract class ServerWorldLightManagerMixin extends WorldLightManager imp
 
         final long key = CoordinateUtils.getChunkKey(chunkX, chunkZ);
 
-        final int references = this.chunksBeingWorkedOn.get(key);
-        this.chunksBeingWorkedOn.put(key, references + 1);
+        final CompletableFuture<Void> updateFuture = runnable.get();
+
+        if (updateFuture == null) {
+            // not scheduled
+            return;
+        }
+
+        final int references = this.chunksBeingWorkedOn.addTo(key, 1);
         if (references == 0) {
             final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
             world.getChunkProvider().registerTicket(StarLightInterface.CHUNK_WORK_TICKET, pos, 0, pos);
         }
 
-        // yes it's rather silly we queue post update as this means two light runTasks() need to be called for runnable
-        // to actually take effect, but it's really the only way we can make chunk light calls prioritised vs
-        // block update calls. This fixes chunk loading/generating breaking when the server is under high stress
-        // from block updates.
-        this.func_215586_a(chunkX, chunkZ, ServerWorldLightManager.Phase.POST_UPDATE, () -> { // enqueue
-            runnable.run();
-            this.func_215586_a(chunkX, chunkZ, ServerWorldLightManager.Phase.POST_UPDATE, () -> { // enqueue
-                world.getChunkProvider().chunkManager.mainThread.execute(() -> {
-                    final int newReferences = this.chunksBeingWorkedOn.get(key);
-                    if (newReferences == 1) {
-                        this.chunksBeingWorkedOn.remove(key);
-                        final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
-                        world.getChunkProvider().releaseTicket(StarLightInterface.CHUNK_WORK_TICKET, pos, 0, pos);
-                    } else {
-                        this.chunksBeingWorkedOn.put(key, newReferences - 1);
-                    }
-                });
-            });
+        // append future to this chunk and 1 radius neighbours chunk save futures
+        // this prevents us from saving the world without first waiting for the light engine
+
+        for (int dx = -1; dx <= 1; ++dx) {
+            for (int dz = -1; dz <= 1; ++dz) {
+                ChunkHolder neighbour = world.getChunkProvider().chunkManager.func_219220_a(CoordinateUtils.getChunkKey(dx + chunkX, dz + chunkZ)); // getUpdatingChunkIfPresent
+                if (neighbour != null) {
+                    neighbour.field_219315_j = neighbour.field_219315_j.thenCombine(updateFuture, (final IChunk curr, final Void ignore) -> { // chunkToSave
+                        return curr;
+                    });
+                }
+            }
+        }
+
+        updateFuture.thenAcceptAsync((final Void ignore) -> {
+            final int newReferences = this.chunksBeingWorkedOn.get(key);
+            if (newReferences == 1) {
+                this.chunksBeingWorkedOn.remove(key);
+                final ChunkPos pos = new ChunkPos(chunkX, chunkZ);
+                world.getChunkProvider().releaseTicket(StarLightInterface.CHUNK_WORK_TICKET, pos, 0, pos);
+            } else {
+                this.chunksBeingWorkedOn.put(key, newReferences - 1);
+            }
+        }, world.getChunkProvider().chunkManager.mainThread).whenComplete((final Void ignore, final Throwable thr) -> {
+            if (thr != null) {
+                LOGGER.fatal("Failed to remove ticket level for post chunk task " + new ChunkPos(chunkX, chunkZ), thr);
+            }
         });
     }
 
@@ -103,7 +120,7 @@ public abstract class ServerWorldLightManagerMixin extends WorldLightManager imp
     public void checkBlock(final BlockPos pos) {
         final BlockPos posCopy = pos.toImmutable();
         this.queueTaskForSection(posCopy.getX() >> 4, posCopy.getY() >> 4, posCopy.getZ() >> 4, () -> {
-            super.checkBlock(posCopy);
+            return this.getLightEngine().blockChange(posCopy);
         });
     }
 
@@ -123,7 +140,7 @@ public abstract class ServerWorldLightManagerMixin extends WorldLightManager imp
     @Overwrite
     public void updateSectionStatus(final SectionPos pos, final boolean notReady) {
         this.queueTaskForSection(pos.getX(), pos.getY(), pos.getZ(), () -> {
-            super.updateSectionStatus(pos, notReady);
+            return this.getLightEngine().sectionChange(pos, notReady);
         });
     }
 
@@ -181,7 +198,8 @@ public abstract class ServerWorldLightManagerMixin extends WorldLightManager imp
             this.chunkManager.func_219209_c(chunkPos); // releaseLightTicket
             return chunk;
         }, (runnable) -> {
-            this.func_215586_a(chunkPos.x, chunkPos.z, ServerWorldLightManager.Phase.PRE_UPDATE, runnable); // enqueue
+            this.getLightEngine().scheduleChunkLight(chunkPos, runnable);
+            this.func_215588_z_(); // tryScheduleUpdate
         }).whenComplete((final IChunk c, final Throwable throwable) -> {
             if (throwable != null) {
                 LOGGER.fatal("Failed to light chunk " + chunkPos, throwable);

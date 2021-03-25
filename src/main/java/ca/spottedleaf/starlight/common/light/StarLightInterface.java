@@ -4,9 +4,9 @@ import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.util.WorldUtil;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
-import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortCollection;
+import it.unimi.dsi.fastutil.shorts.ShortOpenHashSet;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.SectionPos;
@@ -19,9 +19,11 @@ import net.minecraft.world.lighting.IWorldLightListener;
 import net.minecraft.world.server.ServerWorld;
 import net.minecraft.world.server.TicketType;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
@@ -38,7 +40,7 @@ public final class StarLightInterface {
     protected final ArrayDeque<SkyStarLightEngine> cachedSkyPropagators;
     protected final ArrayDeque<BlockStarLightEngine> cachedBlockPropagators;
 
-    protected final Long2ObjectOpenHashMap<ChunkChanges> changedBlocks = new Long2ObjectOpenHashMap<>();
+    protected final LightQueue lightQueue = new LightQueue(this);
 
     protected final IWorldLightListener skyReader;
     protected final IWorldLightListener blockReader;
@@ -232,9 +234,7 @@ public final class StarLightInterface {
     }
 
     public boolean hasUpdates() {
-        synchronized (this) {
-            return !this.changedBlocks.isEmpty();
-        }
+        return !this.lightQueue.isEmpty();
     }
 
     public World getWorld() {
@@ -293,33 +293,20 @@ public final class StarLightInterface {
         }
     }
 
-    public void blockChange(BlockPos pos) {
+    public CompletableFuture<Void> blockChange(final BlockPos pos) {
         if (this.world == null || pos.getY() < WorldUtil.getMinBlockY(this.world) || pos.getY() > WorldUtil.getMaxBlockY(this.world)) { // empty world
-            return;
+            return null;
         }
 
-        pos = pos.toImmutable();
-        synchronized (this.changedBlocks) {
-            this.changedBlocks.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
-                return new ChunkChanges();
-            }).changedPositions.add(pos);
-        }
+        return this.lightQueue.queueBlockChange(pos);
     }
 
-    public void sectionChange(final SectionPos pos, final boolean newEmptyValue) {
+    public CompletableFuture<Void> sectionChange(final SectionPos pos, final boolean newEmptyValue) {
         if (this.world == null) { // empty world
-            return;
+            return null;
         }
 
-        synchronized (this.changedBlocks) {
-            final ChunkChanges changes = this.changedBlocks.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
-                return new ChunkChanges();
-            });
-            if (changes.changedSectionSet == null) {
-                changes.changedSectionSet = new Boolean[this.maxSection - this.minSection + 1];
-            }
-            changes.changedSectionSet[pos.getY() - this.minSection] = Boolean.valueOf(newEmptyValue);
-        }
+        return this.lightQueue.queueSectionChange(pos, newEmptyValue);
     }
 
     public void forceLoadInChunk(final IChunk chunk, final Boolean[] emptySections) {
@@ -443,39 +430,53 @@ public final class StarLightInterface {
         }
     }
 
+    public void scheduleChunkLight(final ChunkPos pos, final Runnable run) {
+        this.lightQueue.queueChunkLighting(pos, run);
+    }
+
+    public void removeChunkTasks(final ChunkPos pos) {
+        this.lightQueue.removeChunk(pos);
+    }
+
     public void propagateChanges() {
-        synchronized (this.changedBlocks) {
-            if (this.changedBlocks.isEmpty()) {
-                return;
-            }
+        if (this.lightQueue.isEmpty()) {
+            return;
         }
+
         final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
         final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
 
         try {
-            // TODO be smarter about this in the future
-            final Long2ObjectOpenHashMap<ChunkChanges> changedBlocks;
-            synchronized (this.changedBlocks) {
-                changedBlocks = this.changedBlocks.clone();
-                this.changedBlocks.clear();
-            }
+            LightQueue.ChunkTasks task;
+            while ((task = this.lightQueue.removeFirstTask()) != null) {
+                if (task.lightTasks != null) {
+                    for (final Runnable run : task.lightTasks) {
+                        run.run();
+                    }
+                }
 
-            for (final Iterator<Long2ObjectMap.Entry<ChunkChanges>> iterator = changedBlocks.long2ObjectEntrySet().fastIterator(); iterator.hasNext();) {
-                final Long2ObjectMap.Entry<ChunkChanges> entry = iterator.next();
-                final long coordinate = entry.getLongKey();
-                final ChunkChanges changes = entry.getValue();
-                final Set<BlockPos> positions = changes.changedPositions;
-                final Boolean[] sectionChanges = changes.changedSectionSet;
-
+                final long coordinate = task.chunkCoordinate;
                 final int chunkX = CoordinateUtils.getChunkX(coordinate);
                 final int chunkZ = CoordinateUtils.getChunkZ(coordinate);
 
-                if (skyEngine != null) {
+                final Set<BlockPos> positions = task.changedPositions;
+                final Boolean[] sectionChanges = task.changedSectionSet;
+
+                if (skyEngine != null && (!positions.isEmpty() || sectionChanges != null)) {
                     skyEngine.blocksChangedInChunk(this.lightAccess, chunkX, chunkZ, positions, sectionChanges);
                 }
-                if (blockEngine != null) {
+                if (blockEngine != null && (!positions.isEmpty() || sectionChanges != null)) {
                     blockEngine.blocksChangedInChunk(this.lightAccess, chunkX, chunkZ, positions, sectionChanges);
                 }
+
+                if (skyEngine != null && task.queuedEdgeChecksSky != null) {
+                    skyEngine.checkChunkEdges(this.lightAccess, chunkX, chunkZ, task.queuedEdgeChecksSky);
+                }
+                if (blockEngine != null && task.queuedEdgeChecksBlock != null) {
+                    blockEngine.checkChunkEdges(this.lightAccess, chunkX, chunkZ, task.queuedEdgeChecksBlock);
+                }
+
+                task.onComplete.complete(null);
             }
         } finally {
             this.releaseSkyLightEngine(skyEngine);
@@ -483,14 +484,102 @@ public final class StarLightInterface {
         }
     }
 
-    protected static final class ChunkChanges {
+    protected static final class LightQueue {
 
-        // note: on the main thread, empty section changes are queued before block changes. This means we don't need
-        // to worry about cases where a block change is called inside an empty chunk section, according to the "emptiness" map per chunk,
-        // for example.
-        public final Set<BlockPos> changedPositions = new HashSet<>();
+        protected final Long2ObjectLinkedOpenHashMap<ChunkTasks> chunkTasks = new Long2ObjectLinkedOpenHashMap<>();
+        protected final StarLightInterface manager;
 
-        public Boolean[] changedSectionSet;
+        public LightQueue(final StarLightInterface manager) {
+            this.manager = manager;
+        }
 
+        public synchronized boolean isEmpty() {
+            return this.chunkTasks.isEmpty();
+        }
+
+        public synchronized CompletableFuture<Void> queueBlockChange(final BlockPos pos) {
+            final ChunkTasks tasks = this.chunkTasks.computeIfAbsent(CoordinateUtils.getChunkKey(pos), ChunkTasks::new);
+            tasks.changedPositions.add(pos.toImmutable());
+            return tasks.onComplete;
+        }
+
+        public synchronized CompletableFuture<Void> queueSectionChange(final SectionPos pos, final boolean newEmptyValue) {
+            final ChunkTasks tasks = this.chunkTasks.computeIfAbsent(CoordinateUtils.getChunkKey(pos), ChunkTasks::new);
+
+            if (tasks.changedSectionSet == null) {
+                tasks.changedSectionSet = new Boolean[this.manager.maxSection - this.manager.minSection + 1];
+            }
+            tasks.changedSectionSet[pos.getY() - this.manager.minSection] = Boolean.valueOf(newEmptyValue);
+
+            return tasks.onComplete;
+        }
+
+        public synchronized CompletableFuture<Void> queueChunkLighting(final ChunkPos pos, final Runnable lightTask) {
+            final ChunkTasks tasks = this.chunkTasks.computeIfAbsent(CoordinateUtils.getChunkKey(pos), ChunkTasks::new);
+            if (tasks.lightTasks == null) {
+                tasks.lightTasks = new ArrayList<>();
+            }
+            tasks.lightTasks.add(lightTask);
+
+            return tasks.onComplete;
+        }
+
+        public synchronized CompletableFuture<Void> queueChunkSkylightEdgeCheck(final SectionPos pos, final ShortCollection sections) {
+            final ChunkTasks tasks = this.chunkTasks.computeIfAbsent(CoordinateUtils.getChunkKey(pos), ChunkTasks::new);
+
+            ShortOpenHashSet queuedEdges = tasks.queuedEdgeChecksSky;
+            if (queuedEdges == null) {
+                queuedEdges = tasks.queuedEdgeChecksSky = new ShortOpenHashSet();
+            }
+            queuedEdges.addAll(sections);
+
+            return tasks.onComplete;
+        }
+
+        public synchronized CompletableFuture<Void> queueChunkBlocklightEdgeCheck(final SectionPos pos, final ShortCollection sections) {
+            final ChunkTasks tasks = this.chunkTasks.computeIfAbsent(CoordinateUtils.getChunkKey(pos), ChunkTasks::new);
+
+            ShortOpenHashSet queuedEdges = tasks.queuedEdgeChecksBlock;
+            if (queuedEdges == null) {
+                queuedEdges = tasks.queuedEdgeChecksBlock = new ShortOpenHashSet();
+            }
+            queuedEdges.addAll(sections);
+
+            return tasks.onComplete;
+        }
+
+        public void removeChunk(final ChunkPos pos) {
+            final ChunkTasks tasks;
+            synchronized (this) {
+                tasks = this.chunkTasks.remove(CoordinateUtils.getChunkKey(pos));
+            }
+            if (tasks != null) {
+                tasks.onComplete.complete(null);
+            }
+        }
+
+        public synchronized ChunkTasks removeFirstTask() {
+            if (this.chunkTasks.isEmpty()) {
+                return null;
+            }
+            return this.chunkTasks.removeFirst();
+        }
+
+        protected static final class ChunkTasks {
+
+            public final Set<BlockPos> changedPositions = new HashSet<>();
+            public Boolean[] changedSectionSet;
+            public ShortOpenHashSet queuedEdgeChecksSky;
+            public ShortOpenHashSet queuedEdgeChecksBlock;
+            public List<Runnable> lightTasks;
+
+            public final CompletableFuture<Void> onComplete = new CompletableFuture<>();
+
+            public final long chunkCoordinate;
+
+            public ChunkTasks(final long chunkCoordinate) {
+                this.chunkCoordinate = chunkCoordinate;
+            }
+        }
     }
 }

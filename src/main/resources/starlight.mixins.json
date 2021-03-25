@@ -6,18 +6,19 @@
   "mixins": [
     "common.blockstate.AbstractBlockStateMixin",
     "common.chunk.ChunkMixin",
-    "common.chunk.ChunkSectionMixin",
-    "common.chunk.EmptyChunkMixin",
     "common.chunk.ChunkPrimerMixin",
     "common.chunk.ChunkPrimerWrapperMixin",
+    "common.chunk.ChunkSectionMixin",
+    "common.chunk.EmptyChunkMixin",
     "common.chunk.WorldChunkMixin",
-    "common.lightengine.WorldLightManagerMixin",
     "common.lightengine.ServerWorldLightManagerMixin",
+    "common.lightengine.WorldLightManagerMixin",
     "common.world.ChunkSerializerMixin",
     "common.world.ServerWorldMixin",
     "common.world.WorldMixin"
   ],
   "client": [
+    "client.multiplayer.ClientPlayNetHandlerMixin",
     "client.world.ClientWorldMixin"
   ],
   "injectors": {

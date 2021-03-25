@@ -117,7 +117,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
     protected int calculateLightValue(final IChunkLightProvider lightAccess, final int worldX, final int worldY, final int worldZ,
                                       final int expect, final VariableBlockLightHandler customBlockLight) {
         final BlockState centerState = this.getBlockState(worldX, worldY, worldZ);
-        int level = centerState.getLightValue() & 0xFF;
+        int level = centerState.getLightValue() & 0xF;
         if (customBlockLight != null) {
             level = this.getCustomLightLevel(customBlockLight, worldX, worldY, worldZ, level);
         }
