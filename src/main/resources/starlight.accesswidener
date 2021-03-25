@@ -1,30 +1,27 @@
 accessWidener v1 named
 
-# AbstractBlockState
-accessible class net/minecraft/block/AbstractBlock$AbstractBlockState$ShapeCache
+# BlockStateBase.ShapeCache
+accessible class net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase$Cache
+accessible field net/minecraft/world/level/block/state/BlockBehaviour$BlockStateBase$Cache lightBlock I
 
 
-# AbstractBlockState.ShapeCache
-accessible field net/minecraft/block/AbstractBlock$AbstractBlockState$ShapeCache lightSubtracted I
-
-
-# ChunkSection
-accessible field net/minecraft/world/chunk/ChunkSection container Lnet/minecraft/world/chunk/PalettedContainer;
+# LevelChunkSection
+accessible field net/minecraft/world/level/chunk/LevelChunkSection states Lnet/minecraft/world/level/chunk/PalettedContainer;
 
 
 # PalettedContainer
-accessible method net/minecraft/world/chunk/PalettedContainer get (I)Ljava/lang/Object;
+accessible method net/minecraft/world/level/chunk/PalettedContainer get (I)Ljava/lang/Object;
 
 
-# ThreadedAnvilChunkStorage
-accessible field net/minecraft/server/world/ThreadedAnvilChunkStorage world Lnet/minecraft/server/world/ServerWorld;
-accessible field net/minecraft/server/world/ThreadedAnvilChunkStorage mainThreadExecutor Lnet/minecraft/util/thread/ThreadExecutor;
+# ChunkMap
+accessible field net/minecraft/server/level/ChunkMap level Lnet/minecraft/server/level/ServerLevel;
+accessible field net/minecraft/server/level/ChunkMap mainThreadExecutor Lnet/minecraft/util/thread/BlockableEventLoop;
 
-accessible method net/minecraft/server/world/ThreadedAnvilChunkStorage getCurrentChunkHolder (J)Lnet/minecraft/server/world/ChunkHolder;
-accessible method net/minecraft/server/world/ThreadedAnvilChunkStorage getChunkHolder (J)Lnet/minecraft/server/world/ChunkHolder;
-accessible method net/minecraft/server/world/ThreadedAnvilChunkStorage getCompletedLevelSupplier (J)Ljava/util/function/IntSupplier;
-accessible method net/minecraft/server/world/ThreadedAnvilChunkStorage releaseLightTicket (Lnet/minecraft/util/math/ChunkPos;)V
+accessible method net/minecraft/server/level/ChunkMap getUpdatingChunkIfPresent (J)Lnet/minecraft/server/level/ChunkHolder;
+accessible method net/minecraft/server/level/ChunkMap getVisibleChunkIfPresent (J)Lnet/minecraft/server/level/ChunkHolder;
+accessible method net/minecraft/server/level/ChunkMap getChunkQueueLevel (J)Ljava/util/function/IntSupplier;
+accessible method net/minecraft/server/level/ChunkMap releaseLightTicket (Lnet/minecraft/world/level/ChunkPos;)V
 
 
-# ServerLightingProvider
-accessible class net/minecraft/server/world/ServerLightingProvider$Stage
+# ThreadedLevelLightEngine
+accessible class net/minecraft/server/level/ThreadedLevelLightEngine$TaskType

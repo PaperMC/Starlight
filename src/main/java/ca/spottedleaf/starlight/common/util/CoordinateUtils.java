@@ -1,10 +1,10 @@
 package ca.spottedleaf.starlight.common.util;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.level.ChunkPos;
 
 public final class CoordinateUtils {
 
@@ -21,14 +21,14 @@ public final class CoordinateUtils {
     }
 
     public static long getChunkKey(final Entity entity) {
-        return ((long)(MathHelper.floor(entity.getZ()) >> 4) << 32) | ((MathHelper.floor(entity.getX()) >> 4) & 0xFFFFFFFFL);
+        return ((long)(Mth.floor(entity.getZ()) >> 4) << 32) | ((Mth.floor(entity.getX()) >> 4) & 0xFFFFFFFFL);
     }
 
     public static long getChunkKey(final ChunkPos pos) {
         return ((long)pos.z << 32) | (pos.x & 0xFFFFFFFFL);
     }
 
-    public static long getChunkKey(final ChunkSectionPos pos) {
+    public static long getChunkKey(final SectionPos pos) {
         return ((long)pos.getZ() << 32) | (pos.getX() & 0xFFFFFFFFL);
     }
 
@@ -45,7 +45,7 @@ public final class CoordinateUtils {
     }
 
     public static int getChunkCoordinate(final double blockCoordinate) {
-        return MathHelper.floor(blockCoordinate) >> 4;
+        return Mth.floor(blockCoordinate) >> 4;
     }
 
     // the section keys are compatible with vanilla's
@@ -68,7 +68,7 @@ public final class CoordinateUtils {
                 | ((z & SECTION_Z_MASK) << SECTION_Z_SHIFT);
     }
 
-    public static long getChunkSectionKey(final ChunkSectionPos pos) {
+    public static long getChunkSectionKey(final SectionPos pos) {
         return ((pos.getX() & SECTION_X_MASK) << SECTION_X_SHIFT)
                 | ((pos.getY() & SECTION_Y_MASK) << SECTION_Y_SHIFT)
                 | ((pos.getZ() & SECTION_Z_MASK) << SECTION_Z_SHIFT);
@@ -87,9 +87,9 @@ public final class CoordinateUtils {
     }
 
     public static long getChunkSectionKey(final Entity entity) {
-        return ((MathHelper.lfloor(entity.getX()) << (SECTION_X_SHIFT - SECTION_TO_BLOCK_SHIFT)) & (SECTION_X_MASK << SECTION_X_SHIFT)) |
-                ((MathHelper.lfloor(entity.getY()) >> SECTION_TO_BLOCK_SHIFT) & (SECTION_Y_MASK << SECTION_Y_SHIFT)) |
-                ((MathHelper.lfloor(entity.getZ()) << (SECTION_Z_SHIFT - SECTION_TO_BLOCK_SHIFT)) & (SECTION_Z_MASK << SECTION_Z_SHIFT));
+        return ((Mth.lfloor(entity.getX()) << (SECTION_X_SHIFT - SECTION_TO_BLOCK_SHIFT)) & (SECTION_X_MASK << SECTION_X_SHIFT)) |
+                ((Mth.lfloor(entity.getY()) >> SECTION_TO_BLOCK_SHIFT) & (SECTION_Y_MASK << SECTION_Y_SHIFT)) |
+                ((Mth.lfloor(entity.getZ()) << (SECTION_Z_SHIFT - SECTION_TO_BLOCK_SHIFT)) & (SECTION_Z_MASK << SECTION_Z_SHIFT));
     }
 
     public static int getChunkSectionX(final long key) {
@@ -107,7 +107,7 @@ public final class CoordinateUtils {
     // the block coordinates are not necessarily compatible with vanilla's
 
     public static int getBlockCoordinate(final double blockCoordinate) {
-        return MathHelper.floor(blockCoordinate);
+        return Mth.floor(blockCoordinate);
     }
 
     public static long getBlockKey(final int x, final int y, final int z) {

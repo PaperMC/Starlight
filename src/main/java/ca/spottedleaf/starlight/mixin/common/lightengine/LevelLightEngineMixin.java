@@ -10,17 +10,18 @@ import ca.spottedleaf.starlight.common.util.WorldUtil;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortOpenHashSet;
-import net.minecraft.server.world.ServerLightingProvider;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.ChunkSectionPos;
-import net.minecraft.world.LightType;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ChunkNibbleArray;
-import net.minecraft.world.chunk.ChunkProvider;
-import net.minecraft.world.chunk.light.ChunkLightingView;
-import net.minecraft.world.chunk.light.LightingProvider;
-import net.minecraft.world.chunk.light.LightingView;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ThreadedLevelLightEngine;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+import net.minecraft.world.level.lighting.LayerLightEventListener;
+import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.lighting.LightEventListener;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Unique;
@@ -29,8 +30,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Iterator;
 
-@Mixin(LightingProvider.class)
-public abstract class LightingProviderMixin implements LightingView, StarLightLightingProvider {
+@Mixin(LevelLightEngine.class)
+public abstract class LevelLightEngineMixin implements LightEventListener, StarLightLightingProvider {
 
     @Unique
     protected StarLightInterface lightEngine;
@@ -47,7 +48,7 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
     @Inject(
             method = "<init>", at = @At("TAIL")
     )
-    public void construct(final ChunkProvider chunkProvider, final boolean hasBlockLight, final boolean hasSkyLight,
+    public void construct(final LightChunkGetter chunkProvider, final boolean hasBlockLight, final boolean hasSkyLight,
                           final CallbackInfo ci) {
         this.lightEngine = new StarLightInterface(chunkProvider, hasSkyLight, hasBlockLight);
     }
@@ -58,7 +59,7 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      */
     @Overwrite
     public void checkBlock(final BlockPos pos) {
-        this.lightEngine.blockChange(pos.toImmutable());
+        this.lightEngine.blockChange(pos.immutable());
     }
 
     /**
@@ -66,7 +67,7 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public void addLightSource(final BlockPos pos, final int level) {
+    public void onBlockEmissionIncrease(final BlockPos pos, final int level) {
         // this light engine only reads levels from blocks, so this is a no-op
     }
 
@@ -75,7 +76,7 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public boolean hasUpdates() {
+    public boolean hasLightWork() {
         // route to new light engine
         return this.lightEngine.hasUpdates();
     }
@@ -85,16 +86,16 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public int doLightUpdates(final int maxUpdateCount, final boolean doSkylight, final boolean skipEdgeLightPropagation) {
+    public int runUpdates(final int maxUpdateCount, final boolean doSkylight, final boolean skipEdgeLightPropagation) {
         // replace impl
-        if ((Object)this instanceof ServerLightingProvider) {
+        if ((Object)this instanceof ThreadedLevelLightEngine) {
             // serverside
-            final boolean hadUpdates = this.hasUpdates();
+            final boolean hadUpdates = this.hasLightWork();
             this.lightEngine.propagateChanges();
             return hadUpdates ? 1 : 0;
         } else {
             // clientside
-            final boolean hadUpdates = this.hasUpdates() || !this.queuedChunkLoads.isEmpty();
+            final boolean hadUpdates = this.hasLightWork() || !this.queuedChunkLoads.isEmpty();
             for (final Iterator<Long2ObjectMap.Entry<Boolean[]>> iterator = this.queuedChunkLoads.long2ObjectEntrySet().fastIterator(); iterator.hasNext();) {
                 final Long2ObjectMap.Entry<Boolean[]> entry = iterator.next();
                 final long coordinate = entry.getLongKey();
@@ -130,7 +131,7 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public void setSectionStatus(final ChunkSectionPos pos, final boolean notReady) {
+    public void updateSectionStatus(final SectionPos pos, final boolean notReady) {
         this.lightEngine.sectionChange(pos, notReady);
     }
 
@@ -154,8 +155,8 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public void setColumnEnabled(final ChunkPos pos, final boolean lightEnabled) {
-        final Chunk chunk = this.getLightEngine().getAnyChunkNow(pos.x, pos.z);
+    public void enableLightSources(final ChunkPos pos, final boolean lightEnabled) {
+        final ChunkAccess chunk = this.getLightEngine().getAnyChunkNow(pos.x, pos.z);
         if (chunk != null) {
             final SWMRNibbleArray[] blockNibbles = this.blockLightMap.get(CoordinateUtils.getChunkKey(pos));
             final SWMRNibbleArray[] skyNibbles = this.skyLightMap.get(CoordinateUtils.getChunkKey(pos));
@@ -181,8 +182,8 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public ChunkLightingView get(final LightType lightType) {
-        return lightType == LightType.BLOCK ? this.lightEngine.getBlockReader() : this.lightEngine.getSkyReader();
+    public LayerLightEventListener getLayerListener(final LightLayer lightType) {
+        return lightType == LightLayer.BLOCK ? this.lightEngine.getBlockReader() : this.lightEngine.getSkyReader();
     }
 
     /**
@@ -190,10 +191,10 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public void enqueueSectionData(final LightType lightType, final ChunkSectionPos pos, final ChunkNibbleArray nibble,
+    public void queueSectionData(final LightLayer lightType, final SectionPos pos, @Nullable final DataLayer nibble,
                                    final boolean trustEdges) {
         // data storage changed with new light impl
-        final Chunk chunk = this.getLightEngine().getAnyChunkNow(pos.getX(), pos.getZ());
+        final ChunkAccess chunk = this.getLightEngine().getAnyChunkNow(pos.getX(), pos.getZ());
         switch (lightType) {
             case BLOCK: {
                 final SWMRNibbleArray[] blockNibbles = this.blockLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
@@ -203,17 +204,17 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
                 final SWMRNibbleArray replacement;
                 if (nibble == null) {
                     replacement = new SWMRNibbleArray(null, true);
-                } else if (nibble.isUninitialized()) {
+                } else if (nibble.isEmpty()) {
                     replacement = new SWMRNibbleArray();
                 } else {
-                    replacement = new SWMRNibbleArray(nibble.asByteArray().clone()); // make sure we don't write to the parameter later
+                    replacement = new SWMRNibbleArray(nibble.getData().clone()); // make sure we don't write to the parameter later
                 }
 
                 blockNibbles[pos.getY() - WorldUtil.getMinLightSection(this.lightEngine.getWorld())] = replacement;
 
                 if (chunk != null) {
                     ((ExtendedChunk)chunk).setBlockNibbles(blockNibbles);
-                    this.lightEngine.getLightAccess().onLightUpdate(LightType.BLOCK, pos);
+                    this.lightEngine.getLightAccess().onLightUpdate(LightLayer.BLOCK, pos);
                 }
                 break;
             }
@@ -225,17 +226,17 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
                 final SWMRNibbleArray replacement;
                 if (nibble == null) {
                     replacement = new SWMRNibbleArray(null, true);
-                } else if (nibble.isUninitialized()) {
+                } else if (nibble.isEmpty()) {
                     replacement = new SWMRNibbleArray();
                 } else {
-                    replacement = new SWMRNibbleArray(nibble.asByteArray().clone()); // make sure we don't write to the parameter later
+                    replacement = new SWMRNibbleArray(nibble.getData().clone()); // make sure we don't write to the parameter later
                 }
 
                 skyNibbles[pos.getY() - WorldUtil.getMinLightSection(this.lightEngine.getWorld())] = replacement;
 
                 if (chunk != null) {
                     ((ExtendedChunk)chunk).setSkyNibbles(skyNibbles);
-                    this.lightEngine.getLightAccess().onLightUpdate(LightType.SKY, pos);
+                    this.lightEngine.getLightAccess().onLightUpdate(LightLayer.SKY, pos);
                 }
                 break;
             }
@@ -247,7 +248,7 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public void setRetainData(final ChunkPos pos, final boolean retainData) {
+    public void retainData(final ChunkPos pos, final boolean retainData) {
         // not used by new light impl
     }
 
@@ -256,10 +257,10 @@ public abstract class LightingProviderMixin implements LightingView, StarLightLi
      * @author Spottedleaf
      */
     @Overwrite
-    public int getLight(final BlockPos pos, final int ambientDarkness) {
+    public int getRawBrightness(final BlockPos pos, final int ambientDarkness) {
         // need to use new light hooks for this
-        final int sky = this.lightEngine.getSkyReader().getLightLevel(pos) - ambientDarkness;
-        final int block = this.lightEngine.getBlockReader().getLightLevel(pos);
+        final int sky = this.lightEngine.getSkyReader().getLightValue(pos) - ambientDarkness;
+        final int block = this.lightEngine.getBlockReader().getLightValue(pos);
         return Math.max(sky, block);
     }
 }

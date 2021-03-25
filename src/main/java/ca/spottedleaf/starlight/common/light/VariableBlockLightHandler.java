@@ -1,6 +1,6 @@
 package ca.spottedleaf.starlight.common.light;
 
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 import java.util.Collection;
 
 /**

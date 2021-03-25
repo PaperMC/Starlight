@@ -3,14 +3,15 @@ package ca.spottedleaf.starlight.mixin.common.chunk;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
-import net.minecraft.block.Block;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.ChunkTickScheduler;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.chunk.ProtoChunk;
-import net.minecraft.world.chunk.UpgradeData;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.ProtoTickList;
+import net.minecraft.world.level.chunk.UpgradeData;
+import net.minecraft.world.level.material.Fluid;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -18,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ProtoChunk.class)
-public abstract class ProtoChunkMixin implements Chunk, ExtendedChunk {
+public abstract class ProtoChunkMixin implements ChunkAccess, ExtendedChunk {
 
     @Unique
     private volatile SWMRNibbleArray[] blockNibbles;
@@ -77,11 +78,12 @@ public abstract class ProtoChunkMixin implements Chunk, ExtendedChunk {
      * TODO since this is a constructor inject, check for new constructors on update.
      */
     @Inject(
-            method = "<init>(Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/world/chunk/UpgradeData;[Lnet/minecraft/world/chunk/ChunkSection;Lnet/minecraft/world/ChunkTickScheduler;Lnet/minecraft/world/ChunkTickScheduler;)V",
+            method = "<init>(Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/chunk/UpgradeData;[Lnet/minecraft/world/level/chunk/LevelChunkSection;Lnet/minecraft/world/level/chunk/ProtoTickList;Lnet/minecraft/world/level/chunk/ProtoTickList;)V",
             at = @At("TAIL")
     )
-    public void onConstruct(final ChunkPos pos, final UpgradeData upgradeData, final ChunkSection[] sections, final ChunkTickScheduler<Block> blockTickScheduler,
-                            final ChunkTickScheduler<Fluid> fluidTickScheduler, final CallbackInfo ci) {
+    public void onConstruct(final ChunkPos chunkPos, final UpgradeData upgradeData, final @Nullable LevelChunkSection[] levelChunkSections,
+                            final ProtoTickList<Block> protoTickList, final ProtoTickList<Fluid> protoTickList2,
+                            final CallbackInfo ci) {
         this.blockNibbles = StarLightEngine.getFilledEmptyLight();
         this.skyNibbles = StarLightEngine.getFilledEmptyLight();
     }
