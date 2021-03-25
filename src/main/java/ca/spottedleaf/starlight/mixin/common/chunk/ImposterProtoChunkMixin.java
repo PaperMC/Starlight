@@ -2,23 +2,27 @@ package ca.spottedleaf.starlight.mixin.common.chunk;
 
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ProtoChunk;
-import net.minecraft.world.chunk.ReadOnlyChunk;
-import net.minecraft.world.chunk.UpgradeData;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ImposterProtoChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.UpgradeData;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
-@Mixin(ReadOnlyChunk.class)
-public abstract class ReadOnlyChunkMixin /*extends ProtoChunk*/ implements Chunk, ExtendedChunk {
-    // TODO fix extends later, it appears due to some bad mappings we can't extend.
+@Mixin(ImposterProtoChunk.class)
+public abstract class ImposterProtoChunkMixin extends ProtoChunk implements ChunkAccess, ExtendedChunk {
 
     @Final
     @Shadow
-    private WorldChunk wrapped;
+    private LevelChunk wrapped;
+
+    public ImposterProtoChunkMixin(final ChunkPos chunkPos, final UpgradeData upgradeData, final LevelHeightAccessor levelHeightAccessor) {
+        super(chunkPos, upgradeData, levelHeightAccessor);
+    }
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {

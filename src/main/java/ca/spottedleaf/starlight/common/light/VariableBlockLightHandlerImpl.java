@@ -3,7 +3,7 @@ package ca.spottedleaf.starlight.common.light;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
-import net.minecraft.util.math.BlockPos;
+import net.minecraft.core.BlockPos;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;

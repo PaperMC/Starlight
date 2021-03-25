@@ -1,16 +1,16 @@
 package ca.spottedleaf.starlight.common.world;
 
 import ca.spottedleaf.starlight.common.light.VariableBlockLightHandler;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunk;
 
 public interface ExtendedWorld {
 
     // rets full chunk without blocking
-    public WorldChunk getChunkAtImmediately(final int chunkX, final int chunkZ);
+    public LevelChunk getChunkAtImmediately(final int chunkX, final int chunkZ);
 
     // rets chunk at any stage, if it exists, immediately
-    public Chunk getAnyChunkImmediately(final int chunkX, final int chunkZ);
+    public ChunkAccess getAnyChunkImmediately(final int chunkX, final int chunkZ);
 
     public VariableBlockLightHandler getCustomLightHandler();
 

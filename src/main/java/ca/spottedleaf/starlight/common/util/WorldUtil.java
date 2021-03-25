@@ -1,6 +1,6 @@
 package ca.spottedleaf.starlight.common.util;
 
-import net.minecraft.world.HeightLimitView;
+import net.minecraft.world.level.LevelHeightAccessor;
 
 public final class WorldUtil {
 
@@ -8,37 +8,37 @@ public final class WorldUtil {
     // please note that the mappings for HeightLimitView are actual trash, so if you use them here you must
     // actually verify with a debugger that they are returning what they say they are
 
-    public static int getMaxSection(final HeightLimitView world) {
-        return world.getTopSectionCoord() - 1; // getTopSectionLimit() is exclusive
+    public static int getMaxSection(final LevelHeightAccessor world) {
+        return world.getMaxSection() - 1; // getMaxSection() is exclusive
     }
 
-    public static int getMinSection(final HeightLimitView world) {
-        return world.getBottomSectionCoord();
+    public static int getMinSection(final LevelHeightAccessor world) {
+        return world.getMinSection();
     }
 
-    public static int getMaxLightSection(final HeightLimitView world) {
+    public static int getMaxLightSection(final LevelHeightAccessor world) {
         return getMaxSection(world) + 1;
     }
 
-    public static int getMinLightSection(final HeightLimitView world) {
+    public static int getMinLightSection(final LevelHeightAccessor world) {
         return getMinSection(world) - 1;
     }
 
 
 
-    public static int getTotalSections(final HeightLimitView world) {
+    public static int getTotalSections(final LevelHeightAccessor world) {
         return getMaxSection(world) - getMinSection(world) + 1;
     }
 
-    public static int getTotalLightSections(final HeightLimitView world) {
+    public static int getTotalLightSections(final LevelHeightAccessor world) {
         return getMaxLightSection(world) - getMinLightSection(world) + 1;
     }
 
-    public static int getMinBlockY(final HeightLimitView world) {
+    public static int getMinBlockY(final LevelHeightAccessor world) {
         return getMinSection(world) << 4;
     }
 
-    public static int getMaxBlockY(final HeightLimitView world) {
+    public static int getMaxBlockY(final LevelHeightAccessor world) {
         return (getMaxSection(world) << 4) | 15;
     }
 
