@@ -3,24 +3,23 @@ package ca.spottedleaf.starlight.mixin.common.chunk;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
-import ca.spottedleaf.starlight.common.util.WorldUtil;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.EmptyChunk;
-import net.minecraft.world.chunk.ProtoChunk;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.EmptyLevelChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.ProtoChunk;
 import org.spongepowered.asm.mixin.Mixin;
 
-@Mixin(EmptyChunk.class)
-public abstract class EmptyChunkMixin extends WorldChunk implements Chunk, ExtendedChunk {
+@Mixin(EmptyLevelChunk.class)
+public abstract class EmptyLevelChunkMixin extends LevelChunk implements ChunkAccess, ExtendedChunk {
 
-    public EmptyChunkMixin(final World world, final ProtoChunk protoChunk) {
-        super(world, protoChunk);
+    public EmptyLevelChunkMixin(final Level level, final ProtoChunk protoChunk) {
+        super(level, protoChunk);
     }
 
     @Override
     public SWMRNibbleArray[] getBlockNibbles() {
-        return StarLightEngine.getFilledEmptyLight(this.getWorld());
+        return StarLightEngine.getFilledEmptyLight(this.getLevel());
     }
 
     @Override
@@ -28,7 +27,7 @@ public abstract class EmptyChunkMixin extends WorldChunk implements Chunk, Exten
 
     @Override
     public SWMRNibbleArray[] getSkyNibbles() {
-        return StarLightEngine.getFilledEmptyLight(this.getWorld());
+        return StarLightEngine.getFilledEmptyLight(this.getLevel());
     }
 
     @Override

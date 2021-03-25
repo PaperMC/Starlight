@@ -3,11 +3,11 @@ package ca.spottedleaf.starlight.mixin.common.blockstate;
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import com.google.common.collect.ImmutableMap;
 import com.mojang.serialization.MapCodec;
-import net.minecraft.block.AbstractBlock;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.state.State;
-import net.minecraft.state.property.Property;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateHolder;
+import net.minecraft.world.level.block.state.properties.Property;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -16,24 +16,19 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(AbstractBlock.AbstractBlockState.class)
-public abstract class AbstractBlockStateMixin extends State<Block, BlockState> implements ExtendedAbstractBlockState {
-
-    protected AbstractBlockStateMixin(final Block owner, final ImmutableMap<Property<?>, Comparable<?>> entries,
-                                      final MapCodec<BlockState> codec) {
-        super(owner, entries, codec);
-    }
+@Mixin(BlockBehaviour.BlockStateBase.class)
+public abstract class BlockStateBaseMixin extends StateHolder<Block, BlockState> implements ExtendedAbstractBlockState {
 
     @Shadow
     @Final
-    private boolean hasSidedTransparency;
+    private boolean useShapeForLightOcclusion;
 
     @Shadow
     @Final
-    private boolean opaque;
+    private boolean canOcclude;
 
     @Shadow
-    protected AbstractBlock.AbstractBlockState.ShapeCache shapeCache;
+    protected BlockBehaviour.BlockStateBase.Cache cache;
 
     @Unique
     private int opacityIfCached;
@@ -41,16 +36,20 @@ public abstract class AbstractBlockStateMixin extends State<Block, BlockState> i
     @Unique
     private boolean isConditionallyFullOpaque;
 
+    protected BlockStateBaseMixin(final Block object, final ImmutableMap<Property<?>, Comparable<?>> immutableMap, final MapCodec<BlockState> mapCodec) {
+        super(object, immutableMap, mapCodec);
+    }
+
     /**
      * Initialises our light state for this block.
      */
     @Inject(
-            method = "initShapeCache",
+            method = "initCache",
             at = @At("RETURN")
     )
     public void initLightAccessState(final CallbackInfo ci) {
-        this.isConditionallyFullOpaque = this.opaque & this.hasSidedTransparency;
-        this.opacityIfCached = this.shapeCache == null || this.isConditionallyFullOpaque ? -1 : this.shapeCache.lightSubtracted;
+        this.isConditionallyFullOpaque = this.canOcclude & this.useShapeForLightOcclusion;
+        this.opacityIfCached = this.cache == null || this.isConditionallyFullOpaque ? -1 : this.cache.lightBlock;
     }
 
     @Override

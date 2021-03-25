@@ -7,7 +7,14 @@
   "authors": [
     "Spottedleaf"
   ],
-  "contact": {},
+  "contact": {
+    "issues": "https://github.com/Spottedleaf/Starlight/issues",
+    "sources": "https://github.com/Spottedleaf/Starlight",
+    "discord": "https://discord.gg/tuinity"
+  },
+  "breaks": {
+    "phosphor" : "*"
+  },
   "license": "LGPL-3.0-only",
   "icon": "assets/starlight/icon.png",
   "environment": "*",

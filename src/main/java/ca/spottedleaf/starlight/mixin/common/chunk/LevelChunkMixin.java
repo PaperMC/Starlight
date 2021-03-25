@@ -3,17 +3,18 @@ package ca.spottedleaf.starlight.mixin.common.chunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
-import net.minecraft.block.Block;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.TickScheduler;
-import net.minecraft.world.World;
-import net.minecraft.world.biome.source.BiomeArray;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.chunk.ProtoChunk;
-import net.minecraft.world.chunk.UpgradeData;
-import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.TickList;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkBiomeContainer;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.UpgradeData;
+import net.minecraft.world.level.material.Fluid;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -21,8 +22,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.function.Consumer;
 
-@Mixin(WorldChunk.class)
-public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
+@Mixin(LevelChunk.class)
+public abstract class LevelChunkMixin implements ExtendedChunk, ChunkAccess {
 
     @Unique
     private volatile SWMRNibbleArray[] blockNibbles;
@@ -81,10 +82,10 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
      * TODO since this is a constructor inject, check for new constructors on update.
      */
     @Inject(
-            method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/world/chunk/ProtoChunk;)V",
+            method = "<init>(Lnet/minecraft/world/level/Level;Lnet/minecraft/world/level/chunk/ProtoChunk;)V",
             at = @At("TAIL")
     )
-    public void onTransitionToFull(final World world, final ProtoChunk protoChunk, final CallbackInfo ci) {
+    public void onTransitionToFull(final Level world, final ProtoChunk protoChunk, final CallbackInfo ci) {
         this.setBlockNibbles(((ExtendedChunk)protoChunk).getBlockNibbles());
         this.setSkyNibbles(((ExtendedChunk)protoChunk).getSkyNibbles());
         this.setSkyEmptinessMap(((ExtendedChunk)protoChunk).getSkyEmptinessMap());
@@ -96,13 +97,13 @@ public abstract class WorldChunkMixin implements ExtendedChunk, Chunk {
      * TODO since this is a constructor inject, check for new constructors on update.
      */
     @Inject(
-            method = "<init>(Lnet/minecraft/world/World;Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/world/biome/source/BiomeArray;Lnet/minecraft/world/chunk/UpgradeData;Lnet/minecraft/world/TickScheduler;Lnet/minecraft/world/TickScheduler;J[Lnet/minecraft/world/chunk/ChunkSection;Ljava/util/function/Consumer;)V",
+            method = "<init>(Lnet/minecraft/world/level/Level;Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/chunk/ChunkBiomeContainer;Lnet/minecraft/world/level/chunk/UpgradeData;Lnet/minecraft/world/level/TickList;Lnet/minecraft/world/level/TickList;J[Lnet/minecraft/world/level/chunk/LevelChunkSection;Ljava/util/function/Consumer;)V",
             at = @At("TAIL")
     )
-    public void onConstruct(final World world, final ChunkPos pos, final BiomeArray biomes, final UpgradeData upgradeData,
-                            final TickScheduler<Block> blockTickScheduler, final TickScheduler<Fluid> fluidTickScheduler,
-                            final long inhabitedTime, final ChunkSection[] sections, final Consumer<WorldChunk> loadToWorldConsumer,
-                            final CallbackInfo ci) {
+    public void onConstruct(final Level world, final ChunkPos chunkPos, final ChunkBiomeContainer chunkBiomeContainer,
+                            final UpgradeData upgradeData, final TickList<Block> tickList, final TickList<Fluid> tickList2,
+                            final long l, final @Nullable LevelChunkSection[] levelChunkSections, final @Nullable Consumer<LevelChunk> consumer,
+                            CallbackInfo ci) {
         this.blockNibbles = StarLightEngine.getFilledEmptyLight(world);
         this.skyNibbles = StarLightEngine.getFilledEmptyLight(world);
     }
