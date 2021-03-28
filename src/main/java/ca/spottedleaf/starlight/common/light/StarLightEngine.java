@@ -102,7 +102,7 @@ public abstract class StarLightEngine {
     // index = x + (z * 5) + (y * 25)
     protected final boolean[] notifyUpdateCache;
 
-    // always initialsed during start of lighting. no index is null.
+    // always initialsed during start of lighting.
     // index = x + (z * 5)
     protected final ChunkAccess[] chunkCache = new ChunkAccess[5 * 5];
 

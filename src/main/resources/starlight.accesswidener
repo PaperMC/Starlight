@@ -23,5 +23,12 @@ accessible method net/minecraft/server/level/ChunkMap getChunkQueueLevel (J)Ljav
 accessible method net/minecraft/server/level/ChunkMap releaseLightTicket (Lnet/minecraft/world/level/ChunkPos;)V
 
 
+# ChunkHolder
+accessible field net/minecraft/server/level/ChunkHolder chunkToSave Ljava/util/concurrent/CompletableFuture;
+
+# LevelLightEngine
+mutable field net/minecraft/world/level/lighting/LevelLightEngine blockEngine Lnet/minecraft/world/level/lighting/LayerLightEngine;
+mutable field net/minecraft/world/level/lighting/LevelLightEngine skyEngine Lnet/minecraft/world/level/lighting/LayerLightEngine;
+
 # ThreadedLevelLightEngine
 accessible class net/minecraft/server/level/ThreadedLevelLightEngine$TaskType

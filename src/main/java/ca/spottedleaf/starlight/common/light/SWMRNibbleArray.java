@@ -42,6 +42,16 @@ public final class SWMRNibbleArray {
         WORKING_BYTES_POOL.get().addFirst(bytes);
     }
 
+    public static SWMRNibbleArray fromVanilla(final DataLayer nibble) {
+        if (nibble == null) {
+            return new SWMRNibbleArray(null, true);
+        } else if (nibble.isEmpty()) {
+            return new SWMRNibbleArray();
+        } else {
+            return new SWMRNibbleArray(nibble.getData().clone()); // make sure we don't write to the parameter later
+        }
+    }
+
     protected int stateUpdating;
     protected volatile int stateVisible;
 
