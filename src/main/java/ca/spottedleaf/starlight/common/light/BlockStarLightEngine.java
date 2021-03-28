@@ -206,16 +206,17 @@ public final class BlockStarLightEngine extends StarLightEngine {
             int offZ = chunk.getPos().z << 4;
 
             final ChunkSection[] sections = chunk.getSections();
-            for (int sectionY = 0; sectionY <= 15; ++sectionY) {
-                if (sections[sectionY] == null || sections[sectionY].isEmpty()) {
+            for (int sectionY = this.minSection; sectionY <= this.maxSection; ++sectionY) {
+                final ChunkSection section = sections[sectionY - this.minSection];
+                if (section == null || section.isEmpty()) {
                     // no sources in empty sections
                     continue;
                 }
-                final PalettedContainer<BlockState> section = sections[sectionY].data;
+                final PalettedContainer<BlockState> states = section.data;
                 final int offY = sectionY << 4;
 
                 for (int index = 0; index < (16 * 16 * 16); ++index) {
-                    final BlockState state = section.get(index);
+                    final BlockState state = states.get(index);
                     if (state.getLightValue() <= 0) {
                         continue;
                     }
