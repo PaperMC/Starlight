@@ -9,6 +9,7 @@ import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
 import net.minecraft.network.protocol.game.ClientboundLevelChunkPacket;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.lighting.LevelLightEngine;
@@ -78,7 +79,7 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
     private void postChunkLoadHook(final ClientboundLevelChunkPacket clientboundLevelChunkPacket, final CallbackInfo ci) {
         final int chunkX = clientboundLevelChunkPacket.getX();
         final int chunkZ = clientboundLevelChunkPacket.getZ();
-        final LevelChunk chunk = this.level.getChunk(chunkX, chunkZ);
+        final LevelChunk chunk = (LevelChunk)this.level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
         if (chunk == null) {
             // failed to load
             return;
