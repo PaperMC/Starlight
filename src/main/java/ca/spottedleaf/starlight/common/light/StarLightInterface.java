@@ -18,6 +18,7 @@ import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
+import net.minecraft.world.level.lighting.LevelLightEngine;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -51,7 +52,9 @@ public final class StarLightInterface {
     protected final int minLightSection;
     protected final int maxLightSection;
 
-    public StarLightInterface(final LightChunkGetter lightAccess, final boolean hasSkyLight, final boolean hasBlockLight) {
+    public final LevelLightEngine lightEngine;
+
+    public StarLightInterface(final LightChunkGetter lightAccess, final boolean hasSkyLight, final boolean hasBlockLight, final LevelLightEngine lightEngine) {
         this.lightAccess = lightAccess;
         this.world = lightAccess == null ? null : (Level)lightAccess.getLevel();
         this.cachedSkyPropagators = hasSkyLight && lightAccess != null ? new ArrayDeque<>() : null;
@@ -68,7 +71,34 @@ public final class StarLightInterface {
             this.minLightSection = WorldUtil.getMinLightSection(this.world);
             this.maxLightSection = WorldUtil.getMaxLightSection(this.world);
         }
+        this.lightEngine = lightEngine;
         this.skyReader = !hasSkyLight ? LayerLightEventListener.DummyLightLayerEventListener.INSTANCE : new LayerLightEventListener() {
+            @Override
+            public void checkBlock(final BlockPos blockPos) {
+                StarLightInterface.this.lightEngine.checkBlock(blockPos.immutable());
+            }
+
+            @Override
+            public void onBlockEmissionIncrease(final BlockPos blockPos, final int i) {
+                // skylight doesn't care
+            }
+
+            @Override
+            public boolean hasLightWork() {
+                // not really correct...
+                return StarLightInterface.this.hasUpdates();
+            }
+
+            @Override
+            public int runUpdates(final int i, final boolean bl, final boolean bl2) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void enableLightSources(final ChunkPos chunkPos, final boolean bl) {
+                throw new UnsupportedOperationException();
+            }
+
             @Override
             public DataLayer getDataLayerData(final SectionPos pos) {
                 final ChunkAccess chunk = StarLightInterface.this.getAnyChunkNow(pos.getX(), pos.getZ());
@@ -171,6 +201,32 @@ public final class StarLightInterface {
             }
         };
         this.blockReader = !hasBlockLight ? LayerLightEventListener.DummyLightLayerEventListener.INSTANCE : new LayerLightEventListener() {
+            @Override
+            public void checkBlock(final BlockPos blockPos) {
+                StarLightInterface.this.lightEngine.checkBlock(blockPos.immutable());
+            }
+
+            @Override
+            public void onBlockEmissionIncrease(final BlockPos blockPos, final int i) {
+                this.checkBlock(blockPos);
+            }
+
+            @Override
+            public boolean hasLightWork() {
+                // not really correct...
+                return StarLightInterface.this.hasUpdates();
+            }
+
+            @Override
+            public int runUpdates(final int i, final boolean bl, final boolean bl2) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void enableLightSources(final ChunkPos chunkPos, final boolean bl) {
+                throw new UnsupportedOperationException();
+            }
+
             @Override
             public DataLayer getDataLayerData(final SectionPos pos) {
                 final ChunkAccess chunk = StarLightInterface.this.getAnyChunkNow(pos.getX(), pos.getZ());
