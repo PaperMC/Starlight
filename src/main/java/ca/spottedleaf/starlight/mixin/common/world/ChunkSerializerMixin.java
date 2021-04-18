@@ -11,11 +11,13 @@ import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.storage.ChunkSerializer;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureManager;
+import org.apache.logging.log4j.Logger;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -23,9 +25,14 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(ChunkSerializer.class)
 public abstract class ChunkSerializerMixin {
 
-    private static final int STARLIGHT_LIGHT_VERSION = 4;
+    @Shadow
+    @Final
+    private static Logger LOGGER;
 
-    private static final String UNINITIALISED_SKYLIGHT_TAG = "starlight.skylight_uninit";
+    private static final int STARLIGHT_LIGHT_VERSION = 5;
+
+    private static final String BLOCKLIGHT_STATE_TAG = "starlight.blocklight_state";
+    private static final String SKYLIGHT_STATE_TAG = "starlight.skylight_state";
     private static final String STARLIGHT_VERSION_TAG = "starlight.light_version";
 
     /**
@@ -37,6 +44,16 @@ public abstract class ChunkSerializerMixin {
             at = @At("RETURN")
     )
     private static void saveLightHook(final ServerLevel world, final ChunkAccess chunk, final CallbackInfoReturnable<CompoundTag> cir) {
+        try {
+            saveLightHookReal(world, chunk, cir);
+        } catch (final Exception ex) {
+            // failing to inject is not fatal so we catch anything here. if it fails, it will have correctly set lit to false
+            // for Vanilla to relight on load and it will not set our lit tag so we will relight on load
+            LOGGER.warn("Failed to inject light data into save data for chunk " + chunk.getPos() + ", chunk light will be recalculated on its next load", ex);
+        }
+    }
+
+    private static void saveLightHookReal(final ServerLevel world, final ChunkAccess chunk, final CallbackInfoReturnable<CompoundTag> cir) {
         final int minSection = WorldUtil.getMinLightSection(world);
         final int maxSection = WorldUtil.getMaxLightSection(world);
         CompoundTag ret = cir.getReturnValue();
@@ -44,15 +61,14 @@ public abstract class ChunkSerializerMixin {
             return;
         }
 
-        SWMRNibbleArray[] blockNibbles = ((ExtendedChunk)chunk).getBlockNibbles();
-        SWMRNibbleArray[] skyNibbles = ((ExtendedChunk)chunk).getSkyNibbles();
+        SWMRNibbleArray[] blockNibbles = ((ExtendedChunk) chunk).getBlockNibbles();
+        SWMRNibbleArray[] skyNibbles = ((ExtendedChunk) chunk).getSkyNibbles();
 
         CompoundTag level = ret.getCompound("Level");
         boolean lit = chunk.isLightCorrect();
         // diff start - store our tag for whether light data is init'd
         if (lit) {
             level.putBoolean("isLightOn", false);
-            level.putInt(STARLIGHT_VERSION_TAG, STARLIGHT_LIGHT_VERSION);
         }
         // diff end - store our tag for whether light data is init'd
         ChunkStatus status = ChunkStatus.byName(level.getString("Status"));
@@ -76,8 +92,8 @@ public abstract class ChunkSerializerMixin {
 
         if (lit && status.isOrAfter(ChunkStatus.LIGHT)) {
             for (int i = minSection; i <= maxSection; ++i) {
-                DataLayer blockNibble = blockNibbles[i - minSection].isAllZero() ? new DataLayer() : blockNibbles[i - minSection].toVanillaNibble();
-                DataLayer skyNibble = skyNibbles[i - minSection].isAllZero() ? new DataLayer() : skyNibbles[i - minSection].toVanillaNibble();
+                SWMRNibbleArray.SaveState blockNibble = blockNibbles[i - minSection].getSaveState();
+                SWMRNibbleArray.SaveState skyNibble = skyNibbles[i - minSection].getSaveState();
                 if (blockNibble != null || skyNibble != null) {
                     CompoundTag section = sections[i - minSection];
                     if (section == null) {
@@ -86,21 +102,24 @@ public abstract class ChunkSerializerMixin {
                         sections[i - minSection] = section;
                     }
 
-                    if (blockNibble != null && !blockNibble.isEmpty()) {
-                        section.putByteArray("BlockLight", blockNibble.getData());
+                    // we store under the same key so mod programs editing nbt
+                    // can still read the data, hopefully.
+                    // however, for compatibility we store chunks as unlit so vanilla
+                    // is forced to re-light them if it encounters our data. It's too much of a burden
+                    // to try and maintain compatibility with a broken and inferior skylight management system.
+
+                    if (blockNibble != null) {
+                        if (blockNibble.data != null) {
+                            section.putByteArray("BlockLight", blockNibble.data);
+                        }
+                        section.putInt(BLOCKLIGHT_STATE_TAG, blockNibble.state);
                     }
 
                     if (skyNibble != null) {
-                        if (skyNibble.isEmpty()) {
-                            section.putBoolean(UNINITIALISED_SKYLIGHT_TAG, true);
-                        } else {
-                            // we store under the same key so mod programs editing nbt
-                            // can still read the data, hopefully.
-                            // however, for compatibility we store chunks as unlit so vanilla
-                            // is forced to re-light them if it encounters our data. It's too much of a burden
-                            // to try and maintain compatibility with a broken and inferior skylight management system.
-                            section.putByteArray("SkyLight", skyNibble.getData());
+                        if (skyNibble.data != null) {
+                            section.putByteArray("SkyLight", skyNibble.data);
                         }
+                        section.putInt(SKYLIGHT_STATE_TAG, skyNibble.state);
                     }
                 }
             }
@@ -114,6 +133,9 @@ public abstract class ChunkSerializerMixin {
             }
         }
         level.put("Sections", sectionsStored);
+        if (lit) {
+            level.putInt(STARLIGHT_VERSION_TAG, STARLIGHT_LIGHT_VERSION); // only mark as fully lit after we have successfully injected our data
+        }
     }
 
     /**
@@ -126,6 +148,16 @@ public abstract class ChunkSerializerMixin {
     )
     private static void loadLightHook(final ServerLevel world, final StructureManager structureManager, final PoiManager poiManager,
                                       final ChunkPos pos, final CompoundTag tag, final CallbackInfoReturnable<ProtoChunk> cir) {
+        try {
+            loadLightHookReal(world, structureManager, poiManager, pos, tag, cir);
+        } catch (final Exception ex) {
+            // failing to inject is not fatal so we catch anything here. if it fails, then we simply relight. Not a problem, we get correct
+            // lighting in both cases.
+            LOGGER.warn("Failed to load light for chunk " + pos + ", light will be recalculated", ex);
+        }
+    }
+    private static void loadLightHookReal(final ServerLevel world, final StructureManager structureManager, final PoiManager poiManager,
+                                      final ChunkPos pos, final CompoundTag tag, final CallbackInfoReturnable<ProtoChunk> cir) {
         final int minSection = WorldUtil.getMinLightSection(world);
         final int maxSection = WorldUtil.getMaxLightSection(world);
         ProtoChunk ret = cir.getReturnValue();
@@ -133,13 +165,15 @@ public abstract class ChunkSerializerMixin {
             return;
         }
 
+        ret.setLightCorrect(false); // mark as unlit in case we fail parsing
+
         SWMRNibbleArray[] blockNibbles = StarLightEngine.getFilledEmptyLight(world);
         SWMRNibbleArray[] skyNibbles = StarLightEngine.getFilledEmptyLight(world);
 
 
         // start copy from from the original method
         CompoundTag levelTag = tag.getCompound("Level");
-        boolean lit = levelTag.getInt(STARLIGHT_VERSION_TAG) == STARLIGHT_LIGHT_VERSION; ret.setLightCorrect(lit); // diff - override lit with our value
+        boolean lit = levelTag.get("isLightOn") != null && levelTag.getInt(STARLIGHT_VERSION_TAG) == STARLIGHT_LIGHT_VERSION;
         boolean canReadSky = world.dimensionType().hasSkyLight();
         ChunkStatus status = ChunkStatus.byName(tag.getCompound("Level").getString("Status"));
         if (lit && status.isOrAfter(ChunkStatus.LIGHT)) { // diff - we add the status check here
@@ -151,7 +185,9 @@ public abstract class ChunkSerializerMixin {
 
                 if (sectionData.contains("BlockLight", 7)) {
                     // this is where our diff is
-                    blockNibbles[y - minSection] = new SWMRNibbleArray(sectionData.getByteArray("BlockLight").clone()); // clone for data safety
+                    blockNibbles[y - minSection] = new SWMRNibbleArray(sectionData.getByteArray("BlockLight").clone(), sectionData.getInt(BLOCKLIGHT_STATE_TAG)); // clone for data safety
+                } else {
+                    blockNibbles[y - minSection] = new SWMRNibbleArray(null, sectionData.getInt(BLOCKLIGHT_STATE_TAG));
                 }
 
                 if (canReadSky) {
@@ -161,9 +197,9 @@ public abstract class ChunkSerializerMixin {
                         // however, for compatibility we store chunks as unlit so vanilla
                         // is forced to re-light them if it encounters our data. It's too much of a burden
                         // to try and maintain compatibility with a broken and inferior skylight management system.
-                        skyNibbles[y - minSection] = new SWMRNibbleArray(sectionData.getByteArray("SkyLight").clone()); // clone for data safety
-                    } else if (sectionData.getBoolean(UNINITIALISED_SKYLIGHT_TAG)) {
-                        skyNibbles[y - minSection] = new SWMRNibbleArray();
+                        skyNibbles[y - minSection] = new SWMRNibbleArray(sectionData.getByteArray("SkyLight").clone(), sectionData.getInt(SKYLIGHT_STATE_TAG)); // clone for data safety
+                    } else {
+                        skyNibbles[y - minSection] = new SWMRNibbleArray(null, sectionData.getInt(SKYLIGHT_STATE_TAG));
                     }
                 }
             }
@@ -172,5 +208,6 @@ public abstract class ChunkSerializerMixin {
 
         ((ExtendedChunk)ret).setBlockNibbles(blockNibbles);
         ((ExtendedChunk)ret).setSkyNibbles(skyNibbles);
+        ret.setLightCorrect(lit); // now we set lit here, only after we've correctly parsed data
     }
 }

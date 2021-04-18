@@ -74,6 +74,14 @@ public final class SkyStarLightEngine extends StarLightEngine {
         this.initNibble(nibble, chunkX, chunkY, chunkZ, extrude);
     }
 
+    @Override
+    protected void setNibbleNull(final int chunkX, final int chunkY, final int chunkZ) {
+        final SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, chunkY, chunkZ);
+        if (nibble != null) {
+            nibble.setNull();
+        }
+    }
+
     protected final void initNibble(final SWMRNibbleArray currNibble, final int chunkX, final int chunkY, final int chunkZ, final boolean extrude) {
         if (!currNibble.isNullNibbleUpdating()) {
             // already initialised
@@ -104,7 +112,9 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
         if (chunkY > lowestY) {
             // we need to set this one to full
-            this.getNibbleFromCache(chunkX, chunkY, chunkZ).setFull();
+            final SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, chunkY, chunkZ);
+            nibble.setNonNull();
+            nibble.setFull();
             return;
         }
 
@@ -114,6 +124,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             for (int currY = chunkY + 1; currY <= this.maxLightSection; ++currY) {
                 final SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, currY, chunkZ);
                 if (nibble != null && !nibble.isNullNibbleUpdating()) {
+                    currNibble.setNonNull();
                     currNibble.extrudeLower(nibble);
                     break;
                 }

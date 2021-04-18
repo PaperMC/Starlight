@@ -759,6 +759,8 @@ public abstract class StarLightEngine {
 
     protected abstract void initNibble(final int chunkX, final int chunkY, final int chunkZ, final boolean extrude, final boolean initRemovedNibbles);
 
+    protected abstract void setNibbleNull(final int chunkX, final int chunkY, final int chunkZ);
+
     // subclasses should not initialise caches, as this will always be done by the super call
     // subclasses should not invoke updateVisible, as this will always be done by the super call
     // subclasses are guaranteed that this is always called before a changed block set
@@ -833,8 +835,6 @@ public abstract class StarLightEngine {
                 }
 
                 for (int sectionY = this.maxLightSection; sectionY >= this.minLightSection; --sectionY) {
-                    final SWMRNibbleArray nibble = this.getNibbleFromCache(dx + chunkX, sectionY, dz + chunkZ);
-
                     // check neighbours to see if we need to de-init this one
                     boolean allEmpty = true;
                     neighbour_search:
@@ -869,9 +869,7 @@ public abstract class StarLightEngine {
                         // to be correct
 
                         // all were empty, so de-init
-                        if (nibble != null) {
-                            nibble.setNull();
-                        }
+                        this.setNibbleNull(dx + chunkX, sectionY, dz + chunkZ);
                     } else if (!allEmpty) {
                         // must init
                         final boolean extrude = (dx | dz) != 0 || !unlit;
