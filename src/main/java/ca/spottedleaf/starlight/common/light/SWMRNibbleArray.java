@@ -20,12 +20,9 @@ public final class SWMRNibbleArray {
     protected static final int INIT_STATE_NULL   = 0; // null
     protected static final int INIT_STATE_UNINIT = 1; // uninitialised
     protected static final int INIT_STATE_INIT   = 2; // initialised
+    protected static final int INIT_STATE_HIDDEN = 3; // initialised, but conversion to Vanilla data should be treated as if NULL
 
     public static final int ARRAY_SIZE = 16 * 16 * 16 / (8/4); // blocks / bytes per block
-    protected static final byte[] FULL_LIT = new byte[ARRAY_SIZE];
-    static {
-        Arrays.fill(FULL_LIT, (byte)-1);
-    }
     // this allows us to maintain only 1 byte array when we're not updating
     static final ThreadLocal<ArrayDeque<byte[]>> WORKING_BYTES_POOL = ThreadLocal.withInitial(ArrayDeque::new);
 
@@ -69,39 +66,97 @@ public final class SWMRNibbleArray {
 
     public SWMRNibbleArray(final byte[] bytes, final boolean isNullNibble) {
         if (bytes != null && bytes.length != ARRAY_SIZE) {
-            throw new IllegalArgumentException();
+            throw new IllegalArgumentException("Data of wrong length: " + bytes.length);
         }
         this.stateVisible = this.stateUpdating = bytes == null ? (isNullNibble ? INIT_STATE_NULL : INIT_STATE_UNINIT) : INIT_STATE_INIT;
         this.storageUpdating = this.storageVisible = bytes;
     }
 
-    // operation type: visible
-    public boolean isAllZero() {
-        final int state = this.stateVisible;
+    public SWMRNibbleArray(final byte[] bytes, final int state) {
+        if (bytes != null && bytes.length != ARRAY_SIZE) {
+            throw new IllegalArgumentException("Data of wrong length: " + bytes.length);
+        }
+        if (bytes == null && (state == INIT_STATE_INIT || state == INIT_STATE_HIDDEN)) {
+            throw new IllegalArgumentException("Data cannot be null and have state be initialised");
+        }
+        this.stateUpdating = this.stateVisible = state;
+        this.storageUpdating = this.storageVisible = bytes;
+    }
 
-        if (state == INIT_STATE_NULL) {
-            return false;
-        } else if (state == INIT_STATE_UNINIT) {
-            return true;
+    @Override
+    public String toString() {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("State: ");
+        switch (this.stateVisible) {
+            case INIT_STATE_NULL:
+                stringBuilder.append("null");
+                break;
+            case INIT_STATE_UNINIT:
+                stringBuilder.append("uninitialised");
+                break;
+            case INIT_STATE_INIT:
+                stringBuilder.append("initialised");
+                break;
+            case INIT_STATE_HIDDEN:
+                stringBuilder.append("hidden");
+                break;
+            default:
+                stringBuilder.append("unknown");
+                break;
+        }
+        stringBuilder.append("\nData:\n");
+
+        final byte[] data = this.storageVisible;
+        if (data != null) {
+            for (int i = 0; i < 4096; ++i) {
+                // Copied from NibbleArray#toString
+                final int level = ((data[i >>> 1] >>> ((i & 1) << 2)) & 0xF);
+
+                stringBuilder.append(Integer.toHexString(level));
+                if ((i & 15) == 15) {
+                    stringBuilder.append("\n");
+                }
+
+                if ((i & 255) == 255) {
+                    stringBuilder.append("\n");
+                }
+            }
+        } else {
+            stringBuilder.append("null");
         }
 
-        synchronized (this) {
-            final byte[] bytes = this.storageVisible;
+        return stringBuilder.toString();
+    }
 
-            if (bytes == null) {
-                return this.stateVisible == INIT_STATE_UNINIT;
+    public SaveState getSaveState() {
+        synchronized (this) {
+            final int state = this.stateVisible;
+            final byte[] data = this.storageVisible;
+            if (state == INIT_STATE_NULL) {
+                return null;
+            }
+            if (state == INIT_STATE_UNINIT) {
+                return new SaveState(null, state);
+            }
+            final boolean zero = isAllZero(data);
+            if (zero) {
+                return state == INIT_STATE_INIT ? new SaveState(null, INIT_STATE_UNINIT) : null;
+            } else {
+                return new SaveState(data.clone(), state);
+            }
+        }
+    }
+
+    protected static boolean isAllZero(final byte[] data) {
+        for (int i = 0; i < (ARRAY_SIZE >>> 4); ++i) {
+            byte whole = data[i << 4];
+
+            for (int k = 1; k < (1 << 4); ++k) {
+                whole |= data[(i << 4) | k];
             }
 
-            for (int i = 0; i < (ARRAY_SIZE >>> 4); ++i) {
-                byte whole = bytes[i << 4];
-
-                for (int k = 1; k < (1 << 4); ++k) {
-                    whole |= bytes[(i << 4) | k];
-                }
-
-                if (whole != 0) {
-                    return false;
-                }
+            if (whole != 0) {
+                return false;
             }
         }
 
@@ -141,20 +196,28 @@ public final class SWMRNibbleArray {
 
     // operation type: updating
     public void setFull() {
-        this.stateUpdating = INIT_STATE_INIT;
+        if (this.stateUpdating != INIT_STATE_HIDDEN) {
+            this.stateUpdating = INIT_STATE_INIT;
+        }
         Arrays.fill(this.storageUpdating == null || !this.updatingDirty ? this.storageUpdating = allocateBytes() : this.storageUpdating, (byte)-1);
         this.updatingDirty = true;
     }
 
     // operation type: updating
     public void setZero() {
-        this.stateUpdating = INIT_STATE_INIT;
+        if (this.stateUpdating != INIT_STATE_HIDDEN) {
+            this.stateUpdating = INIT_STATE_INIT;
+        }
         Arrays.fill(this.storageUpdating == null || !this.updatingDirty ? this.storageUpdating = allocateBytes() : this.storageUpdating, (byte)0);
         this.updatingDirty = true;
     }
 
     // operation type: updating
     public void setNonNull() {
+        if (this.stateUpdating == INIT_STATE_HIDDEN) {
+            this.stateUpdating = INIT_STATE_INIT;
+            return;
+        }
         if (this.stateUpdating != INIT_STATE_NULL) {
             return;
         }
@@ -179,6 +242,18 @@ public final class SWMRNibbleArray {
         }
         this.storageUpdating = null;
         this.updatingDirty = false;
+    }
+
+    // operation type: updating
+    public void setHidden() {
+        if (this.stateUpdating == INIT_STATE_HIDDEN) {
+            return;
+        }
+        if (this.stateUpdating != INIT_STATE_INIT) {
+            this.setNull();
+        } else {
+            this.stateUpdating = INIT_STATE_HIDDEN;
+        }
     }
 
     // operation type: updating
@@ -217,6 +292,16 @@ public final class SWMRNibbleArray {
     }
 
     // operation type: updating
+    public boolean isHiddenUpdating() {
+        return this.stateUpdating == INIT_STATE_HIDDEN;
+    }
+
+    // operation type: updating
+    public boolean isHiddenVisible() {
+        return this.stateVisible == INIT_STATE_HIDDEN;
+    }
+
+    // operation type: updating
     protected void swapUpdatingAndMarkDirty() {
         if (this.updatingDirty) {
             return;
@@ -229,7 +314,9 @@ public final class SWMRNibbleArray {
             System.arraycopy(this.storageUpdating, 0, this.storageUpdating = allocateBytes(), 0, ARRAY_SIZE);
         }
 
-        this.stateUpdating = INIT_STATE_INIT;
+        if (this.stateUpdating != INIT_STATE_HIDDEN) {
+            this.stateUpdating = INIT_STATE_INIT;
+        }
         this.updatingDirty = true;
     }
 
@@ -246,10 +333,14 @@ public final class SWMRNibbleArray {
                 if (this.storageVisible == null) {
                     this.storageVisible = this.storageUpdating.clone();
                 } else {
-                    System.arraycopy(this.storageUpdating, 0, this.storageVisible, 0, ARRAY_SIZE);
+                    if (this.storageUpdating != this.storageVisible) {
+                        System.arraycopy(this.storageUpdating, 0, this.storageVisible, 0, ARRAY_SIZE);
+                    }
                 }
 
-                freeBytes(this.storageUpdating);
+                if (this.storageUpdating != this.storageVisible) {
+                    freeBytes(this.storageUpdating);
+                }
                 this.storageUpdating = this.storageVisible;
             }
             this.updatingDirty = false;
@@ -263,6 +354,7 @@ public final class SWMRNibbleArray {
     public NibbleArray toVanillaNibble() {
         synchronized (this) {
             switch (this.stateVisible) {
+                case INIT_STATE_HIDDEN:
                 case INIT_STATE_NULL:
                     return null;
                 case INIT_STATE_UNINIT:
@@ -331,5 +423,16 @@ public final class SWMRNibbleArray {
         final int i = index >>> 1;
 
         this.storageUpdating[i] = (byte)((this.storageUpdating[i] & (0xF0 >>> shift)) | (value << shift));
+    }
+
+    public static final class SaveState {
+
+        public final byte[] data;
+        public final int state;
+
+        public SaveState(final byte[] data, final int state) {
+            this.data = data;
+            this.state = state;
+        }
     }
 }
