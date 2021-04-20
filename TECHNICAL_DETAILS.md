@@ -1,4 +1,4 @@
-Starlight Technical Details (Draft)
+Starlight Technical Details
 ==
 First and foremost, Starlight is a Vanilla-like light engine. I've seen
 some people say it's not, however just because Starlight is fast enough
@@ -33,7 +33,9 @@ to first outline how Starlight propagates, and then a simplified version
 for Vanilla. Why a simplified version for Vanilla? Because Vanilla
 has quite a few complexities about propagating light decreases that in some
 cases will cause it to eliminate needless updates, however I don't
-fully understand how it works so it is not appropriate for me to explain it.
+fully understand how it works, so it is not appropriate for me to explain it. 
+However, the simplified variant is good enough to understand key differences between 
+Starlight and Vanilla.
 
 This section will be the longest since it's the most
 important factor in Starlight's performance uplift.
@@ -63,17 +65,33 @@ Starlight achieved the first goal by using an extremely basic algorithm,
 one that's even simpler than the Vanilla algorithm, and even more basic
 than even 1.12's light engine.
 
-So how does it work?
-
 I'm going to use the case of propagating block light increases to explain
 the fundamental algorithm. Light decreases are basically the same except
-the algorithm is modified a bit. However, the general method is exactly the same,
-so I am not going to show it.
+the algorithm is modified a bit. The propagation is the same, it will
+track what level the neighbour should be, but instead of updating
+the neighbour to the target level it will do one of two things:
+1. If the neighbour's light value is less-than or equal to the
+ target value, then it will set the neighbour to 0 and queue
+ that neighbour to propagate decreases.
+2. If the neighbour's light value is greater-than the target
+ value, then it will NOT set the neighbour value and instead
+ queue the neighbour for an _increase_, and it must specify
+ to the increase algorithm that the neighbour light should be
+ checked to make sure it is equal to the level it was queued at 
+ (this is to ensure the neighbour doesn't get removed from a later
+ decrease and then incorrectly propagated).
 
-Basically, the propagator takes a light value and a position, and for
-all of its neighbours will calculate what that light value would be for them
-given the neighbour opacity. If the new light value is greater, then
-it will update the neighbours light value and then queue that neighbour
+If you want far more depth about how decreases work, you can
+check out [this blog](https://www.seedofandromeda.com/blogs/29-fast-flood-fill-lighting-in-a-blocky-voxel-game-pt-1).
+I personally found it useful as I was struggling to figure out how to
+propagate light decreases (specifically, how to perform light updates after 
+chunks were lit).
+
+
+For just increases though, the propagator takes a light value and a position, 
+and for all of its neighbours will calculate what that light value would 
+be for them given the neighbour opacity. If the new light value is greater, 
+then it will update the neighbours light value and then queue that neighbour
 to propagate its new light value. The light will propagate in a
 BFS manner.
 
@@ -140,7 +158,12 @@ class Light {
 ```
 
 In order to understand why this algorithm is superior to Vanilla's,
-I need to explain how Vanilla's even works.
+I need to explain how Vanilla's even works, at least on a simple level.
+Vanilla's is more complicated than I'm about to explain, but I'll show
+some real numbers from its algorithms later to show that while
+the model I will make for it isn't accurate, it's "good enough" to 
+explain the significant difference between how Starlight propagates 
+light and Vanilla propagates light.
 
 ### Vanilla propagation algorithm
 
@@ -211,8 +234,9 @@ class Light {
 
 In practice Vanilla has ordered queues by light level, so it always
 processes the highest value queued before any else, but for this
-simple example it doesn't matter. That stuff only comes into play when you
-start queueing up multiple changes initially at _differing_ initial light values.
+simple example it doesn't matter. It also is far more complicated in its implementation,
+and it may not actually read from all neighbours. But for simplicity's sake
+we don't need to go over that, this is good enough for a basic comparison.
 
 
 Like with Starlight, decreases are propagated by modifying the algorithm a bit.
@@ -225,9 +249,9 @@ if the recalculated block should be a skylight source.
 Ok, so why is Starlight's better? It looks like they're both doing
 the same thing...
 
-Except they're not. Not even close. Vanilla is doing WAY more getLight calls
+Except they're not. Not even close. Vanilla is doing WAY more getLight/getState calls
 than Starlight. Why? Because for each block it updates, it is checking ALL 6
-of its neighbours, but for starlight it only checks JUST ONE (the block it
+of its neighbours, but for Starlight it only checks JUST ONE (the block it
 propagated from). To prove this, I wrote a simple piece of code that
 just counted how many calls each light propagator did:
 https://gist.github.com/Spottedleaf/583b606a217ed0bdcdd7f9739f8f45b3
@@ -242,11 +266,8 @@ Vanilla did 4089 setLight calls
 Vanilla did 24534 getState calls
 ```
 
-Wow! `171739` getLight calls vs just `24535`! That's almost `7` times more
-calls (each neighbour must fetch the light value from the world, but
-there are optimisations that can be done to eliminate it, however
-you only eliminate 1 call, so it would be 6 times more calls still...)!
-On top of that, we reduced our block get calls from `24534`
+`171739` getLight calls vs just `24535`! That's almost `7` times more
+calls. On top of that, Starlight reduced our block get calls from `24534`
 to just `4088`, a factor of `6`!
 
 This gets even worse when you realise Vanilla must fetch the block state for
@@ -266,7 +287,8 @@ Yikes. So Starlight's algorithm reduces light gets by 7 times and
 block reads by 6 to 42 times. At least in theory.
 
 While this looks awful for Vanilla in theory, does this really
-happen with Vanilla in practice? Well I wrote a test, and here's
+happen with Vanilla in practice? As I said before, Vanilla's algorithm is far
+more complicated than I have shown. So I wrote a test, and here's
 the output:
 ```
 Starlight block place
@@ -302,20 +324,31 @@ Paper does perform about the same as Vanilla, at least when compared
 to Starlight. So I'll be assuming that these numbers would be
 exact or similar on Vanilla.
 
+If you apply the diff yourself and want to check my numbers, you need
+to entirely disable mob spawning and use a flat world. This is to first
+eliminate noise from clogging your console. Secondly, fly out into the sky where 
+there is just air around. Finally, set a glass block in the chunk section you're in.
+This will prevent both light engines from de-initialising the light in the area,
+and force it to actually propagate increases and decreases. Then, in the _same
+chunk section_, place a glowstone block. Console should output the results.
+Remove the glowstone block. Again console will output the results. You should
+ensure the light sets is exactly 4089, otherwise it implies the output was
+mixed with noise or wasn't the update you expected.
+
 Both light engines unsurprisingly beat the theory, as there are
 more optimisations made. For example, Starlight's propagation
 algorithm does not check the light level of the neighbour it propagated
-from. That alone wipes out 1/6th of the light get checks. Additionally, for
+from. That alone wipes out 1/6th of the light get checks. Then, for
 processing light level increases, Starlight will not add
 light levels greater-than 1 to the queue. Why? Because propagating zero
 to neighbours is never going to work - light values are always >= 0.
 You can modify the example algorithm I wrote to see how significant that change
 really is: from `24535` calls to `19819` calls. A whole 1.2x reduction, just
-by adding one if statement. Further, reducing by 1/6th gives basically
+by adding one if statement. Further, 1/6th gives basically
 exactly what we got in our real test. So Starlight's numbers definitely
 check out and apply in the real world.
 
-Vanilla really did show an improvement over the theory, which was
+Vanilla really did show quite an improvement over the theory, which was
 expected - it's far more complicated in its implementation than the
 example I wrote. There's also more to consider as well, since while it
 made improvements to light gets in this test, that's not the full story.
@@ -340,28 +373,46 @@ additional logic not covered by these numbers in the Vanilla light engine.
 
 Ok, but do these numbers really matter for light propagation?
 
-During development of Starlight 0.0.1 I was benchmarking the worst-case
-lighting scenario: Block changes at max world height. You should read
-the `A note about light data management` section to fully understand
-what I'm about explain.
+I wrote in additional code to lightbench (v1.0.1) that would time light 
+updates on the client and print the timings to sysout if
+the light engine performed any updates. I decided to test
+2 cases: Light updates at = 254 and simple glowstone 
+placing/removal. I used a world that generated grass at y = 254 and
+bedrock at y = 0 to test this. Once again, you need to disable mob spawning
+to prevent noise from mobs updating blocks. Locally I just joined my local
+Tuinity server and configured server.properties to not spawn any mobs.
 
-I was testing a world with grass on y = 254 and bedrock at y = 0, and
-was just testing removing a grass block from y 254 and then adding
-it back. In Starlight 0.0.1, there was no light data management -
-so Starlight would update every position from the max world height down to
-zero. Every. It took 10-11ms to do the removal of the grass block and 10-11ms
-to place the grass block.
+Here are the raw timings for the tests I did:
+https://gist.github.com/Spottedleaf/84cfa932828a3459cf1e2a95dc1f2cf5
 
-Vanilla on the other hand took ~30ms and ~150ms to do these updates (I don't
-remember which number correspond to what operation). Remember, Vanilla
-is only updating a FRACTION of the blocks (the math works out to ~4/16 of
-the blocks, since it only touches 4/16 sections). It still lost by 3x-13.6x,
-even though Starlight did ~4 times more updates. So while there might be
-doubts about Starlight's changes to be incapable of cancelling light updates
-while processing decreases, and thereby reducing total light updates, the math
-shows Starlight is about ~12 to ~50 times faster per light update from this
-test. This test is realistic, as it was literally showing Starlight beating
-Vanilla while doing more way more updates.
+Tested versions:
+- Vanilla Minecraft 1.16.5
+- Phosphor 0.7.1
+- Starlight 1.0.0-RC1
+
+Hardware:
+- Ryzen 9 5950X
+- GTX 750 Ti
+
+The graphs:
+Below is a graph for block updates that occurred on the grass platform
+at y = 254, the light updates had to propagate down to y = 0 where
+the bedrock platform was at.
+![Block update at height graph](https://i.imgur.com/kKtbe9y.png)
+
+Below is a graph for placing a glowstone block on top of the grass platform
+(this did not cause any significant skylight changes).
+![Simple glowstone block update](https://i.imgur.com/z8gopNq.png)
+
+Unsurprisingly Starlight propagated the changes the fastest, as these
+are pure light update propagation tests. This also proves that Starlight's
+propagation algorithm is indeed faster than Vanilla's, and it is faster
+by _a lot_. It is ~20 times faster than Vanilla in the glowstone remove test
+and is ~8 times faster than Vanilla in the glowstone add test.
+Starlight is also ~13 times faster at the block remove at y = 254 test
+and ~37 times faster than the block place test at y = 254 than Vanilla. So
+Starlight is consistently faster than Vanilla in pure light propagation
+tests.
 
 Effectively, Starlight's propagation algorithm is extremely fast. Much
 faster than Vanilla's, and the theory behind it certainly backs it up.
@@ -370,7 +421,7 @@ be dumber and do more light updates total in some cases, it has more
 than enough margin to do the additional wasteful updates and _still_
 beat Vanilla.
 
-## A note about light data management
+## Light data management
 In 1.14 the Vanilla light engine made very significant performance improvements
 to light updates at extreme heights. They managed to do this by realising
 that in a lot of cases, light data was actually redundant and identical to sections
@@ -431,7 +482,7 @@ be ~2000 or more. There was real benchmarking decisions behind making
 these changes. Tux did some async profiling for me, and showed me these results:
 
 ![Profiling Results 1](https://cdn.discordapp.com/attachments/712294045312876586/772876777189802014/Screenshot_from_2020-11-02_12-35-57.png)
-![Profiling Results 2](https://cdn.discordapp.com/attachments/712294045312876586/772876777189802014/Screenshot_from_2020-11-02_12-35-57.png)
+![Profiling Results 2](https://cdn.discordapp.com/attachments/712294045312876586/772877803523145738/Screenshot_from_2020-11-02_12-40-01.png)
 
 You'll notice significant time (about ~12%) is spent setting reading blocks
 from the chunks setting up skylight sources. However, only 4% of the time is
@@ -439,15 +490,14 @@ actually spent reading blocks while propagating light, and a whooping 27% of
 time was spent reading light levels for propagating light. This
 very significant difference made me think that most of the queued values
 were simply not propagating light at all, since their neighbours were most
-likely skylight as well.
+likely full 15 as well.
 
 Effectively all the changes come down to the fact that Starlight needs to
 manually setup light sources, and of course by manually setting them up
-optimisations can be made. It's also the case manually setting them is much
-faster than using the propagation algorithm to do it, since even in the
-Tuinity implementation by manually setting them up we eliminate light level
-reads entirely, whereas Vanilla will have to do them because it's using
-the propagator.
+optimisations can be made. Instead of relying on the propagator, which is
+going to have to do additional block reads and light reads, it can
+simply do the minimum number of block reads per chunk. On Fabric, it
+can avoid block reads entirely.
 
 ### Skylighting in Vanilla
 Skylighting in Vanilla is all done via the light propagator algorithm. So
@@ -482,18 +532,61 @@ Starlight in this case doesn't really make insane improvements on chunk lighting
 compared to Vanilla, but it does make improvements and does do it differently
 than Vanilla. However, the end result in terms of light is going to be the same.
 
+To show the performance difference between Starlight and Vanilla for
+chunk light generation, I wrote a simple tool to test it here:
+https://github.com/Spottedleaf/lightbench
 
-This about concludes the major improvements Starlight does to the light engine.
-I make very small improvements everywhere else in the light engine (i.e the light
-propagator algorithm is very optimised), but this document isn't supposed
-to go line-by-line of Starlight, just the major points. Now it is time to
-discuss the major implications of the changes I've made in Starlight.
+Please note that when comparing these results from the old Starlight README
+and now that I've completely switched systems. Back then I ran an i9-8750H processor
+locked at 2.2GHz (turbo disabled), and now I have a Ryzen 5950X.
+
+Tested versions:
+- Vanilla Minecraft 1.16.5
+- Phosphor 0.7.1
+- Starlight 1.0.0-RC1
+
+Results:
+![Graph](https://i.imgur.com/5aI8Eaf.png)
+The graph above shows how much time the left engine was active
+while generating 10404 chunks.
+
+![Graph 2](https://i.imgur.com/eukEXY6.png)
+The graph above shows how much time it took to generate the 10404 chunks.
+
+Raw output:
+```
+Starlight 1.0.0-RC1:
+[STDOUT]: Completed warmup with total cpu time 3421.875ms
+[STDOUT]: Time to generate 10201 chunks: 58.310475800000006s
+[STDOUT]: Starting real test now
+[STDOUT]: Completed real test with total cpu time 3328.125ms
+[STDOUT]: Time to generate 10404 chunks: 66.8728983s
+
+Vanilla 1.16.5:
+[STDOUT]: Completed warmup with total cpu time 101390.625ms
+[STDOUT]: Time to generate 10201 chunks: 167.8898144s
+[STDOUT]: Starting real test now
+[STDOUT]: Completed real test with total cpu time 106593.75ms
+[STDOUT]: Time to generate 10404 chunks: 139.7255814s
+
+Phosphor 0.7.1:
+[STDOUT]: Starting warmup
+[STDOUT]: Completed warmup with total cpu time 97015.625ms
+[STDOUT]: Time to generate 10201 chunks: 174.95842910000002s
+[STDOUT]: Starting real test now
+[STDOUT]: Completed real test with total cpu time 97750.0ms
+[STDOUT]: Time to generate 10404 chunks: 133.05317250000002s
+```
 
 ## Other Benchmarks
 
 For reference, here are a bunch of comparisons I made back around January 2021.
 Note that the explanations and summary of comparisons is included in each
-video's description.
+video's description. Please note, my CPU specs have since changed from January, 
+back then I ran an i9-8750H processor locked at 2.2GHz (turbo disabled), and
+now I have a Ryzen 9 5950X. So please be aware of that when comparing 
+the old benchmarks I've done and the new. Description for each video
+will say what version of software was tested.
 
 Comparing standard world gen:
 
@@ -506,6 +599,9 @@ https://www.youtube.com/watch?v=RWpv7AOMfNo
 Starlight:
 https://www.youtube.com/watch?v=UMuSegBIBuo
 
+In summary, Starlight significantly reduced the amount
+of time to generate the world. 
+
 [MC-162253](https://bugs.mojang.com/browse/MC-162253):
 
 Vanilla:
@@ -516,6 +612,8 @@ https://www.youtube.com/watch?v=6sTua6QaXSI
 
 Starlight:
 https://www.youtube.com/watch?v=57Y5wKLX7_w
+
+In summary, both Phosphor and Starlight completely fix MC-162253.
 
 Amplified world gen:
 
@@ -528,6 +626,11 @@ https://www.youtube.com/watch?v=4jhzOTVpC1Y
 Starlight:
 https://www.youtube.com/watch?v=WczW8KmcReg
 
+In summary, Starlight significantly reduced the amount
+of time to generate the world. It generated in almost
+the same time as the standard world gen, just 3 seconds
+longer. 
+
 Block changes at maximum world height:
 
 Vanilla:
@@ -538,6 +641,14 @@ https://www.youtube.com/watch?v=twBL2DkJWM4
 
 Starlight:
 https://www.youtube.com/watch?v=5nVYjedJz-U
+
+In summary Starlight basically eliminated the massive frame stall
+from the piston causing the light update at max world height.
+
+This about concludes the major improvements Starlight does to the light engine.
+I make very small improvements everywhere else in the light engine (i.e the light
+propagator algorithm is very optimised), but this document isn't supposed
+to go line-by-line of Starlight, just the major points.
 
 # Important Details to Note
 
@@ -603,3 +714,31 @@ The above issue tracker of course is not 100% complete, as it relies on
 people reporting those issues there - and given it's unlikely I will
 ever fix the incompatibilities, I wouldn't expect many people to even bother
 reporting.
+
+# Conclusion
+
+Starlight is the fastest light engine implementation in Minecraft currently.
+However, that has not come without its price. It will break some mods, and reveals 
+some stuttering problems on the client. So which light engine should you use?
+I would personally recommend against using Vanilla at the minimum, since 
+Phosphor is a proven improvement, and it fixes performance problems 
+like MC-162253. So it comes down to Phosphor or Starlight. In terms of 
+mod compatibility, Phosphor is going to be better since it modifies the
+light engine. Depending on your computer though, and terrain, you might just end up
+seeing more stutters on Starlight. So it depends, I would personally recommend 
+testing both. 
+
+This recommendation changes for larger scale (player wise) servers, however. 
+Larger scale servers are going to suffer more often because of how slow
+the light engine is. If the light engine falls behind for any reason and
+continues to fall behind, and the server is restarted, then pending light
+updates are lost and can cause broken lighting. Starlight fixes this
+by first being faster and so very unlikely to fall behind, and secondly
+by preventing chunks from saved when they have pending light updates. Larger
+scale servers also have more people exploring, which is going to put a higher
+stress on chunk generation, which Starlight will help with.
+
+So I would personally bet for a performant Minecraft experience, Starlight
+will handle large scale servers the best, and depending on various factors
+(see first paragraph) Phosphor might be better for small scale and singleplayer.
+For more modded experiences, double check that your mods are compatible. 
