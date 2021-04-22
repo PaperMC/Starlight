@@ -402,13 +402,13 @@ the bedrock platform was at.
 
 Below is a graph for placing a glowstone block on top of the grass platform
 (this did not cause any significant skylight changes).
-![Simple glowstone block update](https://i.imgur.com/z8gopNq.png)
+![Simple glowstone block update](https://i.imgur.com/yCNK602.png)
 
 Unsurprisingly Starlight propagated the changes the fastest, as these
 are pure light update propagation tests. This also proves that Starlight's
 propagation algorithm is indeed faster than Vanilla's, and it is faster
-by _a lot_. It is ~20 times faster than Vanilla in the glowstone remove test
-and is ~8 times faster than Vanilla in the glowstone add test.
+by _a lot_. It is ~28 times faster than Vanilla in the glowstone remove test
+and is ~12 times faster than Vanilla in the glowstone place test.
 Starlight is also ~13 times faster at the block remove at y = 254 test
 and ~37 times faster than the block place test at y = 254 than Vanilla. So
 Starlight is consistently faster than Vanilla in pure light propagation
