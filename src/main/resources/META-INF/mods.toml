@@ -4,7 +4,7 @@ license = "LGPL-3.0-only"
 
 [[mods]]
  modId = "starlight"
- version = "1.0.0-RC1"
+ version = "1.0.0-RC2"
  displayName = "Starlight"
  authors = "Spottedleaf"
  description = '''
