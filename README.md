@@ -4,52 +4,71 @@ Fabric mod for completely rewriting the vanilla light engine.
 
 ## Known Issues (This is why we're in BETA)
 Check out [The issues tab](https://github.com/Spottedleaf/Starlight/issues)
-Please note that since this is a beta, there could be some (severe) light corrupting issues. Do not use if you do not 
-want to take that risk!
+Please note that since this is a beta, there could be some light corrupting issues. 
+Do not use if you do not want to take that risk!
+
+At this point in Starlight's development, I expect more problems with mod conflicts than
+with lighting issues, though.
 
 ## Contact
 [Discord](https://discord.gg/tuinity)
 
 ## Results
-![Starlight crushing all](https://i.imgur.com/6OcuyJX.png)
-- seed: `vanillakekw`
-- CPU: Intel i7-8750H @ 2.20GHz (Turboboost disabled)
-- Benchmark 101x101 chunks syncloaded centered at (0,0), Warmup 101x101 chunks syncloaded centered at (-10000, -10000)
-- CPU time was measured by forcing the light executor to be single threaded, which allowed
-  very simple CPU thread time measuring via [visualvm](https://visualvm.github.io/).
-- Starlight implementation was tested on [Tuinity](https://github.com/Spottedleaf/Tuinity/tree/dev/lighting) 
+Please note that I do not expect this mod to improve FPS client side. This is mostly going to affect
+chunk generation speed and FPS drops when people are building on large platforms in the sky. Starlight
+also fixes [MC-162253](https://bugs.mojang.com/browse/MC-162253), which only affects
+lag spikes specifically from lighting.
+An increase in chunk generation speed can also negatively affect FPS by making the client 
+render more chunks per frame. However, I only noticed this effect, even on non-optimal hardware,
+when generating amplified worlds which see a very significant chunk generation speed uplift.
 
-The data shows everything we need to know. Starlight took ~7 seconds to generate the light,
-while Vanilla's light engine took ~220s seconds. Phosphor took ~170s. Compared to the best
-mod available (Phosphor), Starlight is about 25 times faster at generating light for chunks - and 
-about 35 times faster than the vanilla light engine.
+The graph below shows how much time the light engine was active while generating 10404 chunks:
+![Light engine time chunk generation Graph](https://i.imgur.com/5aI8Eaf.png)
+- Tested via [LightBench](https://github.com/Spottedleaf/lightbench)
+- World seed: vanillakekw
+- CPU: Ryzen 9 5950X
 
-Starlight will relight vanilla lit chunks due to a difference in how sky light is managed, and the
-new skylight data is incompatible with the vanilla skylight format. However, when vanilla loads
-the chunks, **it will simply relight the chunks, so the save format is compatible with vanilla.** 
-If you are going to compare starlight to vanilla or vice versa, you should be aware of the 
-above - relighting chunks is always more expensive than loading them.
+Below is a graph detailing how long light updates took for breaking/placing
+a block on a large platform at y = 254 down to a large platform at y = 0:
+![Block update at height graph](https://i.imgur.com/kKtbe9y.png)
+- Tested via [LightBench](https://github.com/Spottedleaf/lightbench)
+- World is just a flat world with bedrock at y = 0 and grass at y = 254
+- CPU: Ryzen 9 5950X
+
+Below is a graph detailing light update times for a simple glowstone
+place/break:
+![Simple glowstone block update](https://i.imgur.com/yCNK602.png)
+- Tested via [LightBench](https://github.com/Spottedleaf/lightbench)
+- World is just a flat world with bedrock at y = 0 and grass at y = 254
+- CPU: Ryzen 9 5950X
+- Tested breaking and placing the glowstone on the bedrock platform,
+  where skylight could not interfere with the test.
+
+The results are pretty clear. Starlight is the fastest, by 
+an _unbelievable_ margin. 
+
+If you want more details on these graphs (and how Starlight achieves these numbers), 
+you can check out [TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md), but that document is
+mostly for people who understand programming.
 
 ## Purpose
-The performance of the vanilla engine is just awful. Existing
-modifications like Phosphor or Paper's light engine changes (some of 
-Paper's changes include Phosphor's) fail to fix this issue.
+The performance of the Vanilla engine is just awful. Existing modifications like 
+Phosphor or Paper's light engine changes (some of Paper's changes include Phosphor's) 
+fail to fix this issue, even though they improve it.
 
-Phosphor's changes to the existing light engine are very good, 
-but there's only so much that can be done to vanilla's code to
-improve performance.
+Phosphor's changes to the existing light engine are very good, but there's only 
+so much that can be done to Vanilla's code to improve performance.
+Paper also suffers from the same issue as Phosphor, as they also opt for 
+changing Vanilla code.
 
-Paper also suffers from the same issue as Phosphor, as they also opt
-for changing vanilla code. However, Paper's changes have some technical problems 
-that result in lighting broken lighting. See https://i.imgur.com/bK38jgS.png. 
-For reference, this is what it should look like (generated via starlight): 
-https://i.imgur.com/VND58Yr.jpg
+On inspection of the light engine code to see what was causing such
+regressions in performance, it became obvious that there were
+performance problems were everywhere in how Vanilla processed updates, 
+It seemed like Vanilla was optimised to try and reduce light updates, 
+but it came at the cost of slowing down each light update. So even 
+when it did _fewer_ updates, it took more time.
 
-Could these technical issues be fixed? Maybe, nobody knows what exactly
-is causing the issue, and when the vanilla light engine is
-overcomplicated debugging it was such a mess that everyone working on it gave up.
-Paper's changes also don't even target obvious issues with the light engine...
-
-Effectively, it's really hard to fix the performance of the light engine by
-editing it - it's such a catastrophe it's better off burning it to the ground
-and starting anew.
+So, If I wanted to fix them I would effectively have to end 
+up rewriting most of the light engine, and at that point it's 
+easier to write a new one than rework the one old. The 
+Vanilla light engine simply had too many problems to fix.
