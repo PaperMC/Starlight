@@ -400,8 +400,8 @@ at y = 254, the light updates had to propagate down to y = 0 where
 the bedrock platform was at.
 ![Block update at height graph](https://i.imgur.com/kKtbe9y.png)
 
-Below is a graph for placing a glowstone block on top of the grass platform
-(this did not cause any significant skylight changes).
+Below is a graph for placing a glowstone block on top of the bedrock platform
+(so that skylight had zero effect)
 ![Simple glowstone block update](https://i.imgur.com/yCNK602.png)
 
 Unsurprisingly Starlight propagated the changes the fastest, as these
@@ -547,7 +547,7 @@ Tested versions:
 
 Results:
 ![Graph](https://i.imgur.com/5aI8Eaf.png)
-The graph above shows how much time the left engine was active
+The graph above shows how much time the light engine was active
 while generating 10404 chunks.
 
 ![Graph 2](https://i.imgur.com/eukEXY6.png)
