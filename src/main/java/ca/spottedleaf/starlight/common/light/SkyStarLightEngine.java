@@ -230,7 +230,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
     @Override
     protected boolean canUseChunk(final IChunk chunk) {
         // can only use chunks for sky stuff if their sections have been init'd
-        return chunk.getStatus().isAtLeast(ChunkStatus.LIGHT) && (this.isClientSide ? true : chunk.hasLight());
+        return chunk.getStatus().isAtLeast(ChunkStatus.LIGHT) && (this.isClientSide || chunk.hasLight());
     }
 
     @Override

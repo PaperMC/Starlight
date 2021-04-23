@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class BlockStarLightEngine extends StarLightEngine {
 
@@ -251,7 +252,17 @@ public final class BlockStarLightEngine extends StarLightEngine {
 
             return ret.iterator();
         } else {
-            return chunk.getLightSources().iterator();
+            // world gen and lighting run in parallel, and if lighting keeps up it can be lighting chunks that are
+            // being generated. In the nether, lava will add a lot of sources. This resulted in quite a few CME crashes.
+            // So all we do spinloop until we can collect a list of sources, and even if it is out of date we will pick up
+            // the missing sources from checkBlock.
+            for (;;) {
+                try {
+                    return chunk.getLightSources().collect(Collectors.toList()).iterator();
+                } catch (final Exception cme) {
+                    continue;
+                }
+            }
         }
     }
 

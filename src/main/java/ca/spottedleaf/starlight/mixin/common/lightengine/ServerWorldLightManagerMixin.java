@@ -53,8 +53,16 @@ public abstract class ServerWorldLightManagerMixin extends WorldLightManager imp
         final ServerWorld world = (ServerWorld)this.getLightEngine().getWorld();
 
         final IChunk center = this.getLightEngine().getAnyChunkNow(chunkX, chunkZ);
-        if (center == null || !center.getStatus().isAtLeast(ChunkStatus.LIGHT) || !center.hasLight()) {
-            // do not accept updates in unlit chunks
+        if (center == null || !center.getStatus().isAtLeast(ChunkStatus.LIGHT)) {
+            // do not accept updates in unlit chunks, unless we might be generating a chunk. thanks to the amazing
+            // chunk scheduling, we could be lighting and generating a chunk at the same time
+            return;
+        }
+
+        if (center.getStatus() != ChunkStatus.FULL) {
+            // do not keep chunk loaded, we are probably in a gen thread
+            // if we proceed to add a ticket the chunk will be loaded, which is not what we want (avoid cascading gen)
+            runnable.get();
             return;
         }
 

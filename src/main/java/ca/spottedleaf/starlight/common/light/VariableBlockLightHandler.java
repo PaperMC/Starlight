@@ -6,7 +6,10 @@ import java.util.Collection;
 /**
  * Recommended implementation is {@link VariableBlockLightHandlerImpl}, but you can implement this interface yourself
  * if you want.
+ *
+ * @deprecated To be removed in 1.17 due to Mojang adding a custom light block.
  */
+@Deprecated
 public interface VariableBlockLightHandler {
 
     /**
