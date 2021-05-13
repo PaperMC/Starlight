@@ -46,6 +46,10 @@ processResources {
 // this fixes some edge cases with special characters not displaying correctly
 // see http://yodaconditions.net/blog/fix-for-java-file-encoding-problems-with-gradle.html
 tasks.withType(JavaCompile) {
+  // Use JDK 16 for JavaCompile
+  javaCompiler = javaToolchains.compilerFor {
+      languageVersion = JavaLanguageVersion.of(16)
+  }
     options.encoding = "UTF-8"
 }
 
@@ -66,7 +70,7 @@ java {
     // If You have already installed JDK 16 then check if You have the JAVA_HOME and PATH set correctly
     // because Gradle sometimes fails to use JDK 16 because it FINDS it but can't use it for some reason
     toolchain {
-          languageVersion.set(JavaLanguageVersion.of(16))
+         languageVersion = JavaLanguageVersion.of(16)
         }
 }
 jar {
