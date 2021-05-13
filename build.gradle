@@ -50,6 +50,7 @@ tasks.withType(JavaCompile) {
   javaCompiler = javaToolchains.compilerFor {
       languageVersion = JavaLanguageVersion.of(16)
   }
+    options.release.set(16)
     options.encoding = "UTF-8"
 }
 
