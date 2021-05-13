@@ -68,8 +68,8 @@ java {
     withSourcesJar()
     // Java Toolchain - auto downloads JDK 16 from: https://adoptopenjdk.net
     // and also sets SOURCE_COMPATIBILITY and TARGET_COMPATIBILITY
-    // If You have already installed JDK 16 then check if You have the JAVA_HOME and PATH set correctly
-    // because Gradle sometimes fails to use JDK 16 because it FINDS it but can't use it for some reason
+    // NOTE: Loom is being applied before so if the current java version
+    // isn't JRE/JDK 16 then it will fail
     toolchain {
          languageVersion = JavaLanguageVersion.of(16)
         }
