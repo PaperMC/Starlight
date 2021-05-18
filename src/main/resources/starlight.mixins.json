@@ -3,6 +3,7 @@
   "minVersion": "0.8",
   "package": "ca.spottedleaf.starlight.mixin",
   "compatibilityLevel": "JAVA_8",
+  "plugin": "ca.spottedleaf.starlight.mixin.StarlightMixinPlugin",
   "mixins": [
     "common.blockstate.AbstractBlockStateMixin",
     "common.chunk.ChunkMixin",
@@ -11,6 +12,8 @@
     "common.chunk.ChunkSectionMixin",
     "common.chunk.EmptyChunkMixin",
     "common.chunk.WorldChunkMixin",
+    "common.compat.create.WrappedChunkMixin",
+    "common.compat.create.WrappedWorldMixin",
     "common.lightengine.ServerWorldLightManagerMixin",
     "common.lightengine.WorldLightManagerMixin",
     "common.world.ChunkSerializerMixin",

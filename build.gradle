@@ -13,6 +13,13 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle'
 
+repositories {
+    maven {
+        name = 'cursemaven'
+        url = 'https://cursemaven.com'
+    }
+}
+
 group = "ca.spottedleaf.${modid}-forge"
 version = "${mod_version}"
 archivesBaseName = "${modid}"
@@ -101,6 +108,7 @@ jar {
 dependencies {
     minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
     compile 'org.spongepowered:mixin:0.8'
+    compileOnly fg.deobf("curse.maven:create-328085:3278516") // Create v0.3.1c
 }
 
 apply plugin: 'org.spongepowered.mixin'
