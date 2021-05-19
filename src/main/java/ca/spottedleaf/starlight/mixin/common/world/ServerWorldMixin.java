@@ -25,9 +25,6 @@ import java.util.function.Supplier;
 @Mixin(ServerWorld.class)
 public abstract class ServerWorldMixin extends World implements ISeedReader, ExtendedWorld {
 
-    @Unique
-    private VariableBlockLightHandler customBlockLightHandler;
-
     protected ServerWorldMixin(final ISpawnWorldInfo worldInfo, final RegistryKey<World> dimension, final DimensionType dimensionType,
                                final Supplier<IProfiler> profiler, final boolean isRemote, final boolean isDebug, final long seed) {
         super(worldInfo, dimension, dimensionType, profiler, isRemote, isDebug, seed);
@@ -35,16 +32,6 @@ public abstract class ServerWorldMixin extends World implements ISeedReader, Ext
 
     @Shadow
     public abstract ServerChunkProvider getChunkProvider();
-
-    @Override
-    public final VariableBlockLightHandler getCustomLightHandler() {
-        return this.customBlockLightHandler;
-    }
-
-    @Override
-    public final void setCustomLightHandler(final VariableBlockLightHandler handler) {
-        this.customBlockLightHandler = handler;
-    }
 
     @Override
     public final Chunk getChunkAtImmediately(final int chunkX, final int chunkZ) {

@@ -16,12 +16,12 @@ public abstract class WorldMixin implements IWorld, AutoCloseable, ExtendedWorld
     private VariableBlockLightHandler customBlockLightHandler;
 
     @Override
-    public VariableBlockLightHandler getCustomLightHandler() {
+    public final VariableBlockLightHandler getCustomLightHandler() {
         return this.customBlockLightHandler;
     }
 
     @Override
-    public void setCustomLightHandler(final VariableBlockLightHandler handler) {
+    public final void setCustomLightHandler(final VariableBlockLightHandler handler) {
         this.customBlockLightHandler = handler;
     }
 

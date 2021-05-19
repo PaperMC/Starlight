@@ -22,22 +22,9 @@ public abstract class ClientWorldMixin extends World implements ExtendedWorld {
     @Shadow
     public abstract ClientChunkProvider getChunkProvider();
 
-    @Unique
-    private VariableBlockLightHandler customBlockLightHandler;
-
     protected ClientWorldMixin(final ISpawnWorldInfo worldInfo, final RegistryKey<World> dimension, final DimensionType dimensionType,
                                final Supplier<IProfiler> profiler, final boolean isRemote, final boolean isDebug, final long seed) {
         super(worldInfo, dimension, dimensionType, profiler, isRemote, isDebug, seed);
-    }
-
-    @Override
-    public final VariableBlockLightHandler getCustomLightHandler() {
-        return this.customBlockLightHandler;
-    }
-
-    @Override
-    public final void setCustomLightHandler(final VariableBlockLightHandler handler) {
-        this.customBlockLightHandler = handler;
     }
 
     @Override
