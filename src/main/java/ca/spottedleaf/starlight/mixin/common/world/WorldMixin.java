@@ -4,8 +4,6 @@ import ca.spottedleaf.starlight.common.light.VariableBlockLightHandler;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import net.minecraft.world.IWorld;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.IChunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 

@@ -1,6 +1,5 @@
 package ca.spottedleaf.starlight.mixin.client.world;
 
-import ca.spottedleaf.starlight.common.light.VariableBlockLightHandler;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import net.minecraft.client.multiplayer.ClientChunkProvider;
 import net.minecraft.client.world.ClientWorld;
@@ -13,7 +12,6 @@ import net.minecraft.world.chunk.IChunk;
 import net.minecraft.world.storage.ISpawnWorldInfo;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import java.util.function.Supplier;
 
 @Mixin(ClientWorld.class)
