@@ -509,7 +509,7 @@ public final class StarLightInterface {
             if (tasks.changedSectionSet == null) {
                 tasks.changedSectionSet = new Boolean[this.manager.maxSection - this.manager.minSection + 1];
             }
-            tasks.changedSectionSet[pos.getY() - this.manager.minSection] = Boolean.valueOf(newEmptyValue);
+            tasks.changedSectionSet[Math.floorMod(pos.getY() - this.manager.minSection, tasks.changedSectionSet.length)] = Boolean.valueOf(newEmptyValue);
 
             return tasks.onComplete;
         }
