@@ -63,7 +63,7 @@ changing Vanilla code.
 
 On inspection of the light engine code to see what was causing such
 regressions in performance, it became obvious that there were
-performance problems everywhere in how Vanilla processed updates, 
+performance problems everywhere in how Vanilla processed updates. 
 It seemed like Vanilla was optimised to try and reduce light updates, 
 but it came at the cost of slowing down each light update. So even 
 when it did _fewer_ updates, it took more time.
