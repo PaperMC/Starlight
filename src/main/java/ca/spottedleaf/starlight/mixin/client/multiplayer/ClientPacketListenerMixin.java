@@ -70,7 +70,7 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
     @Inject(
             method = "handleLevelChunk",
             at = @At(
-                    target = "Lnet/minecraft/client/multiplayer/ClientChunkCache;replaceWithPacketData(IILnet/minecraft/world/level/chunk/ChunkBiomeContainer;Lnet/minecraft/network/FriendlyByteBuf;Lnet/minecraft/nbt/CompoundTag;IZ)Lnet/minecraft/world/level/chunk/LevelChunk;",
+                    target = "Lnet/minecraft/client/multiplayer/ClientChunkCache;replaceWithPacketData(IILnet/minecraft/world/level/chunk/ChunkBiomeContainer;Lnet/minecraft/network/FriendlyByteBuf;Lnet/minecraft/nbt/CompoundTag;Ljava/util/BitSet;)Lnet/minecraft/world/level/chunk/LevelChunk;",
                     value = "INVOKE",
                     ordinal = 0,
                     shift = At.Shift.AFTER

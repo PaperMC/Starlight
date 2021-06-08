@@ -4,6 +4,7 @@ import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.LevelChunkSection;
@@ -78,13 +79,13 @@ public abstract class ProtoChunkMixin implements ChunkAccess, ExtendedChunk {
      * TODO since this is a constructor inject, check for new constructors on update.
      */
     @Inject(
-            method = "<init>(Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/chunk/UpgradeData;[Lnet/minecraft/world/level/chunk/LevelChunkSection;Lnet/minecraft/world/level/chunk/ProtoTickList;Lnet/minecraft/world/level/chunk/ProtoTickList;)V",
+            method = "<init>(Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/chunk/UpgradeData;[Lnet/minecraft/world/level/chunk/LevelChunkSection;Lnet/minecraft/world/level/chunk/ProtoTickList;Lnet/minecraft/world/level/chunk/ProtoTickList;Lnet/minecraft/world/level/LevelHeightAccessor;)V",
             at = @At("TAIL")
     )
     public void onConstruct(final ChunkPos chunkPos, final UpgradeData upgradeData, final @Nullable LevelChunkSection[] levelChunkSections,
-                            final ProtoTickList<Block> protoTickList, final ProtoTickList<Fluid> protoTickList2,
+                            final ProtoTickList<Block> protoTickList, final ProtoTickList<Fluid> protoTickList2, final LevelHeightAccessor levelHeightAccessor,
                             final CallbackInfo ci) {
-        this.blockNibbles = StarLightEngine.getFilledEmptyLight();
-        this.skyNibbles = StarLightEngine.getFilledEmptyLight();
+        this.blockNibbles = StarLightEngine.getFilledEmptyLight(levelHeightAccessor);
+        this.skyNibbles = StarLightEngine.getFilledEmptyLight(levelHeightAccessor);
     }
 }

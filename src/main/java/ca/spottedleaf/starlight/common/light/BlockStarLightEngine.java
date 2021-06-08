@@ -96,10 +96,9 @@ public final class BlockStarLightEngine extends StarLightEngine {
         final int encodeOffset = this.coordinateOffset;
         final int emittedMask = this.emittedLightMask;
 
-        final VariableBlockLightHandler customBlockHandler = ((ExtendedWorld)lightAccess.getLevel()).getCustomLightHandler();
         final int currentLevel = this.getLightLevel(worldX, worldY, worldZ);
         final BlockState blockState = this.getBlockState(worldX, worldY, worldZ);
-        final int emittedLevel = (customBlockHandler != null ? this.getCustomLightLevel(customBlockHandler, worldX, worldY, worldZ, blockState.getLightEmission()) : blockState.getLightEmission()) & emittedMask;
+        final int emittedLevel = blockState.getLightEmission() & emittedMask;
 
         this.setLightLevel(worldX, worldY, worldZ, emittedLevel);
         // this accounts for change in emitted light that would cause an increase
@@ -131,12 +130,9 @@ public final class BlockStarLightEngine extends StarLightEngine {
 
     @Override
     protected int calculateLightValue(final LightChunkGetter lightAccess, final int worldX, final int worldY, final int worldZ,
-                                      final int expect, final VariableBlockLightHandler customBlockLight) {
+                                      final int expect) {
         final BlockState centerState = this.getBlockState(worldX, worldY, worldZ);
         int level = centerState.getLightEmission() & 0xF;
-        if (customBlockLight != null) {
-            level = this.getCustomLightLevel(customBlockLight, worldX, worldY, worldZ, level);
-        }
 
         if (level >= (15 - 1) || level > expect) {
             return level;
@@ -242,15 +238,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
                 }
             }
 
-            final VariableBlockLightHandler customBlockHandler = ((ExtendedWorld)lightAccess.getLevel()).getCustomLightHandler();
-            if (customBlockHandler == null) {
-                return sources.iterator();
-            }
-
-            final Set<BlockPos> ret = new HashSet<>(sources);
-            ret.addAll(customBlockHandler.getCustomLightPositions(chunk.getPos().x, chunk.getPos().z));
-
-            return ret.iterator();
+            return sources.iterator();
         } else {
             // world gen and lighting run in parallel, and if lighting keeps up it can be lighting chunks that are
             // being generated. In the nether, lava will add a lot of sources. This resulted in quite a few CME crashes.
@@ -270,11 +258,10 @@ public final class BlockStarLightEngine extends StarLightEngine {
     public void lightChunk(final LightChunkGetter lightAccess, final ChunkAccess chunk, final boolean needsEdgeChecks) {
         // setup sources
         final int emittedMask = this.emittedLightMask;
-        final VariableBlockLightHandler customBlockHandler = ((ExtendedWorld)lightAccess.getLevel()).getCustomLightHandler();
         for (final Iterator<BlockPos> positions = this.getSources(lightAccess, chunk); positions.hasNext();) {
             final BlockPos pos = positions.next();
             final BlockState blockState = this.getBlockState(pos.getX(), pos.getY(), pos.getZ());
-            final int emittedLight = (customBlockHandler != null ? this.getCustomLightLevel(customBlockHandler, pos.getX(), pos.getY(), pos.getZ(), blockState.getLightEmission()) : blockState.getLightEmission()) & emittedMask;
+            final int emittedLight = blockState.getLightEmission() & emittedMask;
 
             if (emittedLight <= this.getLightLevel(pos.getX(), pos.getY(), pos.getZ())) {
                 // some other source is brighter
