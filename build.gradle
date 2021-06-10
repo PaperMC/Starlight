@@ -13,8 +13,8 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle'
 
-group = "ca.spottedleaf.${modid}-forge"
-version = "${mod_version}"
+group = "ca.spottedleaf.starlight"
+version = mod_version + '+forge.' + lastCommitHash()
 archivesBaseName = "${modid}"
 
 sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8'
@@ -123,3 +123,12 @@ processResources {
 }
 
 jar.finalizedBy('reobfJar')
+
+String lastCommitHash() {
+    def out = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'rev-parse', '--short', 'HEAD'
+        standardOutput = out
+    }
+    return out.toString().trim()
+}
