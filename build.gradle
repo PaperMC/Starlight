@@ -111,6 +111,13 @@ mixin {
 
 
 processResources {
+    inputs.property("version", project.version)
+    filesMatching("**/mods.toml") {
+        expand(
+                'version': project.version
+        )
+    }
+
     filesMatching('*') {
         expand(
                 'modid': project.property('modid'),
