@@ -25,6 +25,8 @@ accessible method net/minecraft/server/level/ChunkMap releaseLightTicket (Lnet/m
 
 # ChunkHolder
 accessible field net/minecraft/server/level/ChunkHolder chunkToSave Ljava/util/concurrent/CompletableFuture;
+accessible field net/minecraft/server/level/ChunkHolder resendLight Z
+accessible field net/minecraft/server/level/ChunkHolder BLOCKS_BEFORE_RESEND_FUDGE I
 
 # LevelLightEngine
 mutable field net/minecraft/world/level/lighting/LevelLightEngine blockEngine Lnet/minecraft/world/level/lighting/LayerLightEngine;
