@@ -169,7 +169,7 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
 
     @Override
     public void clientUpdateLight(final LightLayer lightType, final SectionPos pos,
-                            final @Nullable DataLayer nibble, final boolean trustEdges) {
+                                  final DataLayer nibble, final boolean trustEdges) {
         if (((Object)this).getClass() != LevelLightEngine.class) {
             throw new IllegalStateException("This hook is for the CLIENT ONLY");
         }

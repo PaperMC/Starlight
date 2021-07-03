@@ -774,12 +774,13 @@ public abstract class StarLightEngine {
 
         // update emptiness map
         for (int sectionIndex = (emptinessChanges.length - 1); sectionIndex >= 0; --sectionIndex) {
-            final Boolean valueBoxed = emptinessChanges[sectionIndex];
+            Boolean valueBoxed = emptinessChanges[sectionIndex];
             if (valueBoxed == null) {
-                if (needsInit) {
-                    throw new IllegalStateException("Current chunk has not initialised emptiness map yet supplied emptiness map isn't filled?");
+                if (!needsInit) {
+                    continue;
                 }
-                continue;
+                final LevelChunkSection section = this.getChunkSection(chunkX, sectionIndex + this.minSection, chunkZ);
+                emptinessChanges[sectionIndex] = valueBoxed = section == null || section.isEmpty() ? Boolean.TRUE : Boolean.FALSE;
             }
             chunkEmptinessMap[sectionIndex] = valueBoxed.booleanValue();
         }
