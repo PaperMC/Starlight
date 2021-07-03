@@ -1,6 +1,6 @@
 package ca.spottedleaf.starlight.mixin.common.world;
 
-import ca.spottedleaf.starlight.common.SaveUtil;
+import ca.spottedleaf.starlight.common.util.SaveUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
