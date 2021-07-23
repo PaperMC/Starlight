@@ -1,8 +1,8 @@
 package ca.spottedleaf.starlight.mixin.common.chunk;
 
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
-import net.minecraft.world.chunk.IChunk;
+import net.minecraft.world.level.chunk.ChunkAccess;
 import org.spongepowered.asm.mixin.Mixin;
 
-@Mixin(IChunk.class)
-public interface ChunkMixin extends ExtendedChunk {}
+@Mixin(ChunkAccess.class)
+public interface ChunkAccessMixin extends ExtendedChunk {}

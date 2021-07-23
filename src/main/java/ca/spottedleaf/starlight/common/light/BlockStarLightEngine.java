@@ -4,18 +4,18 @@ import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.shapes.VoxelShape;
-import net.minecraft.util.math.shapes.VoxelShapes;
-import net.minecraft.util.palette.PalettedContainer;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ChunkPrimerWrapper;
-import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.IChunk;
-import net.minecraft.world.chunk.IChunkLightProvider;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.ImposterProtoChunk;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.world.phys.shapes.VoxelShape;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -25,33 +25,33 @@ import java.util.stream.Collectors;
 
 public final class BlockStarLightEngine extends StarLightEngine {
 
-    public BlockStarLightEngine(final World world) {
+    public BlockStarLightEngine(final Level world) {
         super(false, world);
     }
 
     @Override
-    protected boolean[] getEmptinessMap(final IChunk chunk) {
+    protected boolean[] getEmptinessMap(final ChunkAccess chunk) {
         return ((ExtendedChunk)chunk).getBlockEmptinessMap();
     }
 
     @Override
-    protected void setEmptinessMap(final IChunk chunk, final boolean[] to) {
+    protected void setEmptinessMap(final ChunkAccess chunk, final boolean[] to) {
         ((ExtendedChunk)chunk).setBlockEmptinessMap(to);
     }
 
     @Override
-    protected SWMRNibbleArray[] getNibblesOnChunk(final IChunk chunk) {
+    protected SWMRNibbleArray[] getNibblesOnChunk(final ChunkAccess chunk) {
         return ((ExtendedChunk)chunk).getBlockNibbles();
     }
 
     @Override
-    protected void setNibbles(final IChunk chunk, final SWMRNibbleArray[] to) {
+    protected void setNibbles(final ChunkAccess chunk, final SWMRNibbleArray[] to) {
         ((ExtendedChunk)chunk).setBlockNibbles(to);
     }
 
     @Override
-    protected boolean canUseChunk(final IChunk chunk) {
-        return chunk.getStatus().isAtLeast(ChunkStatus.LIGHT) && (this.isClientSide || chunk.hasLight());
+    protected boolean canUseChunk(final ChunkAccess chunk) {
+        return chunk.getStatus().isOrAfter(ChunkStatus.LIGHT) && (this.isClientSide || chunk.isLightCorrect());
     }
 
     @Override
@@ -88,7 +88,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
     }
 
     @Override
-    protected final void checkBlock(final IChunkLightProvider lightAccess, final int worldX, final int worldY, final int worldZ) {
+    protected final void checkBlock(final LightChunkGetter lightAccess, final int worldX, final int worldY, final int worldZ) {
         // blocks can change opacity
         // blocks can change emitted light
         // blocks can change direction of propagation
@@ -96,10 +96,9 @@ public final class BlockStarLightEngine extends StarLightEngine {
         final int encodeOffset = this.coordinateOffset;
         final int emittedMask = this.emittedLightMask;
 
-        final VariableBlockLightHandler customBlockHandler = ((ExtendedWorld)lightAccess.getWorld()).getCustomLightHandler();
         final int currentLevel = this.getLightLevel(worldX, worldY, worldZ);
         final BlockState blockState = this.getBlockState(worldX, worldY, worldZ);
-        final int emittedLevel = (customBlockHandler != null ? this.getCustomLightLevel(customBlockHandler, worldX, worldY, worldZ, blockState.getLightValue()) : blockState.getLightValue()) & emittedMask;
+        final int emittedLevel = blockState.getLightEmission() & emittedMask;
 
         this.setLightLevel(worldX, worldY, worldZ, emittedLevel);
         // this accounts for change in emitted light that would cause an increase
@@ -126,17 +125,14 @@ public final class BlockStarLightEngine extends StarLightEngine {
         // re-propagating neighbours (done by the decrease queue) will also account for opacity changes in this block
     }
 
-    protected final BlockPos.Mutable recalcCenterPos = new BlockPos.Mutable();
-    protected final BlockPos.Mutable recalcNeighbourPos = new BlockPos.Mutable();
+    protected final BlockPos.MutableBlockPos recalcCenterPos = new BlockPos.MutableBlockPos();
+    protected final BlockPos.MutableBlockPos recalcNeighbourPos = new BlockPos.MutableBlockPos();
 
     @Override
-    protected int calculateLightValue(final IChunkLightProvider lightAccess, final int worldX, final int worldY, final int worldZ,
-                                      final int expect, final VariableBlockLightHandler customBlockLight) {
+    protected int calculateLightValue(final LightChunkGetter lightAccess, final int worldX, final int worldY, final int worldZ,
+                                      final int expect) {
         final BlockState centerState = this.getBlockState(worldX, worldY, worldZ);
-        int level = centerState.getLightValue() & 0xF;
-        if (customBlockLight != null) {
-            level = this.getCustomLightLevel(customBlockLight, worldX, worldY, worldZ, level);
-        }
+        int level = centerState.getLightEmission() & 0xF;
 
         if (level >= (15 - 1) || level > expect) {
             return level;
@@ -147,8 +143,8 @@ public final class BlockStarLightEngine extends StarLightEngine {
         int opacity = ((ExtendedAbstractBlockState)centerState).getOpacityIfCached();
 
         if (opacity == -1) {
-            this.recalcCenterPos.setPos(worldX, worldY, worldZ);
-            opacity = centerState.getOpacity(lightAccess.getWorld(), this.recalcCenterPos);
+            this.recalcCenterPos.set(worldX, worldY, worldZ);
+            opacity = centerState.getLightBlock(lightAccess.getLevel(), this.recalcCenterPos);
             if (((ExtendedAbstractBlockState)centerState).isConditionallyFullOpaque()) {
                 conditionallyOpaqueState = centerState;
             } else {
@@ -182,10 +178,10 @@ public final class BlockStarLightEngine extends StarLightEngine {
                 // we don't read the blockstate because most of the time this is false, so using the faster
                 // known transparency lookup results in a net win
                 final BlockState neighbourState = this.getBlockState(offX, offY, offZ);
-                this.recalcNeighbourPos.setPos(offX, offY, offZ);
-                final VoxelShape neighbourFace = neighbourState.getFaceOcclusionShape(lightAccess.getWorld(), this.recalcNeighbourPos, direction.opposite.nms);
-                final VoxelShape thisFace = conditionallyOpaqueState == null ? VoxelShapes.empty() : conditionallyOpaqueState.getFaceOcclusionShape(lightAccess.getWorld(), this.recalcCenterPos, direction.nms);
-                if (VoxelShapes.faceShapeCovers(thisFace, neighbourFace)) {
+                this.recalcNeighbourPos.set(offX, offY, offZ);
+                final VoxelShape neighbourFace = neighbourState.getFaceOcclusionShape(lightAccess.getLevel(), this.recalcNeighbourPos, direction.opposite.nms);
+                final VoxelShape thisFace = conditionallyOpaqueState == null ? Shapes.empty() : conditionallyOpaqueState.getFaceOcclusionShape(lightAccess.getLevel(), this.recalcCenterPos, direction.nms);
+                if (Shapes.faceShapeOccludes(thisFace, neighbourFace)) {
                     // not allowed to propagate
                     continue;
                 }
@@ -204,7 +200,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
     }
 
     @Override
-    protected void propagateBlockChanges(final IChunkLightProvider lightAccess, final IChunk atChunk, final Set<BlockPos> positions) {
+    protected void propagateBlockChanges(final LightChunkGetter lightAccess, final ChunkAccess atChunk, final Set<BlockPos> positions) {
         for (final BlockPos pos : positions) {
             this.checkBlock(lightAccess, pos.getX(), pos.getY(), pos.getZ());
         }
@@ -212,8 +208,8 @@ public final class BlockStarLightEngine extends StarLightEngine {
         this.performLightDecrease(lightAccess);
     }
 
-    protected Iterator<BlockPos> getSources(final IChunkLightProvider lightAccess, final IChunk chunk) {
-        if (chunk instanceof ChunkPrimerWrapper || chunk instanceof Chunk) {
+    protected Iterator<BlockPos> getSources(final LightChunkGetter lightAccess, final ChunkAccess chunk) {
+        if (chunk instanceof ImposterProtoChunk || chunk instanceof LevelChunk) {
             // implementation on Chunk is pretty awful, so write our own here. The big optimisation is
             // skipping empty sections, and the far more optimised reading of types.
             List<BlockPos> sources = new ArrayList<>();
@@ -221,19 +217,19 @@ public final class BlockStarLightEngine extends StarLightEngine {
             int offX = chunk.getPos().x << 4;
             int offZ = chunk.getPos().z << 4;
 
-            final ChunkSection[] sections = chunk.getSections();
+            final LevelChunkSection[] sections = chunk.getSections();
             for (int sectionY = this.minSection; sectionY <= this.maxSection; ++sectionY) {
-                final ChunkSection section = sections[sectionY - this.minSection];
+                final LevelChunkSection section = sections[sectionY - this.minSection];
                 if (section == null || section.isEmpty()) {
                     // no sources in empty sections
                     continue;
                 }
-                final PalettedContainer<BlockState> states = section.data;
+                final PalettedContainer<BlockState> states = section.states;
                 final int offY = sectionY << 4;
 
                 for (int index = 0; index < (16 * 16 * 16); ++index) {
                     final BlockState state = states.get(index);
-                    if (state.getLightValue() <= 0) {
+                    if (state.getLightEmission() <= 0) {
                         continue;
                     }
 
@@ -242,15 +238,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
                 }
             }
 
-            final VariableBlockLightHandler customBlockHandler = ((ExtendedWorld)lightAccess.getWorld()).getCustomLightHandler();
-            if (customBlockHandler == null) {
-                return sources.iterator();
-            }
-
-            final Set<BlockPos> ret = new HashSet<>(sources);
-            ret.addAll(customBlockHandler.getCustomLightPositions(chunk.getPos().x, chunk.getPos().z));
-
-            return ret.iterator();
+            return sources.iterator();
         } else {
             // world gen and lighting run in parallel, and if lighting keeps up it can be lighting chunks that are
             // being generated. In the nether, lava will add a lot of sources. This resulted in quite a few CME crashes.
@@ -258,7 +246,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
             // the missing sources from checkBlock.
             for (;;) {
                 try {
-                    return chunk.getLightSources().collect(Collectors.toList()).iterator();
+                    return chunk.getLights().collect(Collectors.toList()).iterator();
                 } catch (final Exception cme) {
                     continue;
                 }
@@ -267,14 +255,13 @@ public final class BlockStarLightEngine extends StarLightEngine {
     }
 
     @Override
-    public void lightChunk(final IChunkLightProvider lightAccess, final IChunk chunk, final boolean needsEdgeChecks) {
+    public void lightChunk(final LightChunkGetter lightAccess, final ChunkAccess chunk, final boolean needsEdgeChecks) {
         // setup sources
         final int emittedMask = this.emittedLightMask;
-        final VariableBlockLightHandler customBlockHandler = ((ExtendedWorld)lightAccess.getWorld()).getCustomLightHandler();
         for (final Iterator<BlockPos> positions = this.getSources(lightAccess, chunk); positions.hasNext();) {
             final BlockPos pos = positions.next();
             final BlockState blockState = this.getBlockState(pos.getX(), pos.getY(), pos.getZ());
-            final int emittedLight = (customBlockHandler != null ? this.getCustomLightLevel(customBlockHandler, pos.getX(), pos.getY(), pos.getZ(), blockState.getLightValue()) : blockState.getLightValue()) & emittedMask;
+            final int emittedLight = blockState.getLightEmission() & emittedMask;
 
             if (emittedLight <= this.getLightLevel(pos.getX(), pos.getY(), pos.getZ())) {
                 // some other source is brighter

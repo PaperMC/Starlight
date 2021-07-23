@@ -1,6 +1,6 @@
 package ca.spottedleaf.starlight.common.light;
 
-import net.minecraft.world.chunk.NibbleArray;
+import net.minecraft.world.level.chunk.DataLayer;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 
@@ -39,7 +39,7 @@ public final class SWMRNibbleArray {
         WORKING_BYTES_POOL.get().addFirst(bytes);
     }
 
-    public static SWMRNibbleArray fromVanilla(final NibbleArray nibble) {
+    public static SWMRNibbleArray fromVanilla(final DataLayer nibble) {
         if (nibble == null) {
             return new SWMRNibbleArray(null, true);
         } else if (nibble.isEmpty()) {
@@ -351,16 +351,16 @@ public final class SWMRNibbleArray {
     }
 
     // operation type: visible
-    public NibbleArray toVanillaNibble() {
+    public DataLayer toVanillaNibble() {
         synchronized (this) {
             switch (this.stateVisible) {
                 case INIT_STATE_HIDDEN:
                 case INIT_STATE_NULL:
                     return null;
                 case INIT_STATE_UNINIT:
-                    return new NibbleArray();
+                    return new DataLayer();
                 case INIT_STATE_INIT:
-                    return new NibbleArray(this.storageVisible.clone());
+                    return new DataLayer(this.storageVisible.clone());
                 default:
                     throw new IllegalStateException();
             }

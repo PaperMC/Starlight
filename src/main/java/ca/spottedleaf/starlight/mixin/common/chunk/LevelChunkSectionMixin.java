@@ -2,9 +2,9 @@ package ca.spottedleaf.starlight.mixin.common.chunk;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
-import net.minecraft.block.BlockState;
-import net.minecraft.util.palette.PalettedContainer;
-import net.minecraft.world.chunk.ChunkSection;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.spongepowered.asm.mixin.Final;
@@ -16,12 +16,12 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(ChunkSection.class)
-public abstract class ChunkSectionMixin implements ExtendedChunkSection {
+@Mixin(LevelChunkSection.class)
+public abstract class LevelChunkSectionMixin implements ExtendedChunkSection {
 
     @Final
     @Shadow
-    public PalettedContainer<BlockState> data;
+    public PalettedContainer<BlockState> states;
 
     @Unique
     protected int transparentBlockCount;
@@ -63,7 +63,7 @@ public abstract class ChunkSectionMixin implements ExtendedChunkSection {
         for (int y = 0; y <= 15; ++y) {
             for (int z = 0; z <= 15; ++z) {
                 for (int x = 0; x <= 15; ++x) {
-                    final long transparency = getKnownTransparency(this.data.get(x, y, z));
+                    final long transparency = getKnownTransparency(this.states.get(x, y, z));
                     if (transparency == ExtendedChunkSection.BLOCK_IS_TRANSPARENT) {
                         ++this.transparentBlockCount;
                     }
@@ -78,7 +78,7 @@ public abstract class ChunkSectionMixin implements ExtendedChunkSection {
      * calculateCounts is not called clientside.
      */
     @Inject(
-            method = "recalculateRefCounts",
+            method = "recalcBlockCounts",
             at = @At("RETURN")
     )
     private void initKnownTransparenciesDataServerSide(final CallbackInfo ci) {
@@ -102,7 +102,7 @@ public abstract class ChunkSectionMixin implements ExtendedChunkSection {
      * Callback used to update the transparency data on block update.
      */
     @Inject(
-            method = "setBlockState(IIILnet/minecraft/block/BlockState;Z)Lnet/minecraft/block/BlockState;",
+            method = "setBlockState(IIILnet/minecraft/world/level/block/state/BlockState;Z)Lnet/minecraft/world/level/block/state/BlockState;",
             at = @At("RETURN")
     )
     private void updateBlockCallback(final int x, final int y, final int z, final BlockState state, final boolean lock,

@@ -1,70 +1,58 @@
 package ca.spottedleaf.starlight.mixin.common.world;
 
-import ca.spottedleaf.starlight.common.light.VariableBlockLightHandler;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import com.mojang.datafixers.util.Either;
-import net.minecraft.profiler.IProfiler;
-import net.minecraft.util.RegistryKey;
-import net.minecraft.world.DimensionType;
-import net.minecraft.world.ISeedReader;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.Chunk;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.IChunk;
-import net.minecraft.world.server.ChunkHolder;
-import net.minecraft.world.server.ChunkManager;
-import net.minecraft.world.server.ServerChunkProvider;
-import net.minecraft.world.server.ServerWorld;
-import net.minecraft.world.storage.ISpawnWorldInfo;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ChunkMap;
+import net.minecraft.server.level.ServerChunkCache;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.profiling.ProfilerFiller;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.WorldGenLevel;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.storage.WritableLevelData;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import java.util.function.Supplier;
 
-@Mixin(ServerWorld.class)
-public abstract class ServerWorldMixin extends World implements ISeedReader, ExtendedWorld {
-
-    @Unique
-    private VariableBlockLightHandler customBlockLightHandler;
-
-    protected ServerWorldMixin(final ISpawnWorldInfo worldInfo, final RegistryKey<World> dimension, final DimensionType dimensionType,
-                               final Supplier<IProfiler> profiler, final boolean isRemote, final boolean isDebug, final long seed) {
-        super(worldInfo, dimension, dimensionType, profiler, isRemote, isDebug, seed);
-    }
+@Mixin(ServerLevel.class)
+public abstract class ServerWorldMixin extends Level implements WorldGenLevel, ExtendedWorld {
 
     @Shadow
-    public abstract ServerChunkProvider getChunkProvider();
+    @Final
+    private ServerChunkCache chunkSource;
 
-    @Override
-    public final VariableBlockLightHandler getCustomLightHandler() {
-        return this.customBlockLightHandler;
+    protected ServerWorldMixin(final WritableLevelData writableLevelData, final ResourceKey<Level> resourceKey,
+                               final DimensionType dimensionType, final Supplier<ProfilerFiller> supplier, final boolean bl,
+                               final boolean bl2, final long l) {
+        super(writableLevelData, resourceKey, dimensionType, supplier, bl, bl2, l);
     }
 
     @Override
-    public final void setCustomLightHandler(final VariableBlockLightHandler handler) {
-        this.customBlockLightHandler = handler;
-    }
-
-    @Override
-    public final Chunk getChunkAtImmediately(final int chunkX, final int chunkZ) {
-        final ChunkManager storage = this.getChunkProvider().chunkManager;
-        final ChunkHolder holder = storage.func_219219_b(CoordinateUtils.getChunkKey(chunkX, chunkZ)); // getChunkHolderOffThread
+    public final LevelChunk getChunkAtImmediately(final int chunkX, final int chunkZ) {
+        final ChunkMap storage = this.chunkSource.chunkMap;
+        final ChunkHolder holder = storage.getUpdatingChunkIfPresent(CoordinateUtils.getChunkKey(chunkX, chunkZ));
 
         if (holder == null) {
             return null;
         }
 
-        final Either<IChunk, ChunkHolder.IChunkLoadingError> either = holder.func_219301_a(ChunkStatus.FULL).getNow(null); // getChunkFuture
+        final Either<ChunkAccess, ChunkHolder.ChunkLoadingFailure> either = holder.getFutureIfPresentUnchecked(ChunkStatus.FULL).getNow(null);
 
-        return either == null ? null : (Chunk)either.left().orElse(null);
+        return either == null ? null : (LevelChunk)either.left().orElse(null);
     }
 
     @Override
-    public final IChunk getAnyChunkImmediately(final int chunkX, final int chunkZ) {
-        final ChunkManager storage = this.getChunkProvider().chunkManager;
-        final ChunkHolder holder = storage.func_219219_b(CoordinateUtils.getChunkKey(chunkX, chunkZ)); // getChunkHolderOffThread
+    public final ChunkAccess getAnyChunkImmediately(final int chunkX, final int chunkZ) {
+        final ChunkMap storage = this.chunkSource.chunkMap;
+        final ChunkHolder holder = storage.getUpdatingChunkIfPresent(CoordinateUtils.getChunkKey(chunkX, chunkZ));
 
-        return holder == null ? null : holder.func_219287_e(); // getCurrentChunk
+        return holder == null ? null : holder.getLastAvailable();
     }
 }

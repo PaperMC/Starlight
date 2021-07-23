@@ -1,24 +1,25 @@
 package ca.spottedleaf.starlight.mixin.common.chunk;
 
+import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
-import ca.spottedleaf.starlight.common.light.StarLightEngine;
-import net.minecraft.block.Block;
-import net.minecraft.fluid.Fluid;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.palette.UpgradeData;
-import net.minecraft.world.chunk.ChunkPrimer;
-import net.minecraft.world.chunk.ChunkPrimerTickList;
-import net.minecraft.world.chunk.ChunkSection;
-import net.minecraft.world.chunk.IChunk;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.ProtoChunk;
+import net.minecraft.world.level.chunk.ProtoTickList;
+import net.minecraft.world.level.chunk.UpgradeData;
+import net.minecraft.world.level.material.Fluid;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ChunkPrimer.class)
-public abstract class ChunkPrimerMixin implements IChunk, ExtendedChunk {
+@Mixin(ProtoChunk.class)
+public abstract class ProtoChunkMixin implements ChunkAccess, ExtendedChunk {
 
     @Unique
     private volatile SWMRNibbleArray[] blockNibbles;
@@ -77,13 +78,13 @@ public abstract class ChunkPrimerMixin implements IChunk, ExtendedChunk {
      * TODO since this is a constructor inject, check for new constructors on update.
      */
     @Inject(
-            method = "<init>(Lnet/minecraft/util/math/ChunkPos;Lnet/minecraft/util/palette/UpgradeData;[Lnet/minecraft/world/chunk/ChunkSection;Lnet/minecraft/world/chunk/ChunkPrimerTickList;Lnet/minecraft/world/chunk/ChunkPrimerTickList;)V",
+            method = "<init>(Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/chunk/UpgradeData;[Lnet/minecraft/world/level/chunk/LevelChunkSection;Lnet/minecraft/world/level/chunk/ProtoTickList;Lnet/minecraft/world/level/chunk/ProtoTickList;Lnet/minecraft/world/level/LevelHeightAccessor;)V",
             at = @At("TAIL")
     )
-    public void onConstruct(final ChunkPos pos, final UpgradeData upgradeData, final ChunkSection[] sections,
-                            final ChunkPrimerTickList<Block> pendingBlockTicks, final ChunkPrimerTickList<Fluid> pendingFluidTicks,
+    public void onConstruct(final ChunkPos chunkPos, final UpgradeData upgradeData, final LevelChunkSection[] levelChunkSections,
+                            final ProtoTickList<Block> protoTickList, final ProtoTickList<Fluid> protoTickList2, final LevelHeightAccessor levelHeightAccessor,
                             final CallbackInfo ci) {
-        this.blockNibbles = StarLightEngine.getFilledEmptyLight();
-        this.skyNibbles = StarLightEngine.getFilledEmptyLight();
+        this.blockNibbles = StarLightEngine.getFilledEmptyLight(levelHeightAccessor);
+        this.skyNibbles = StarLightEngine.getFilledEmptyLight(levelHeightAccessor);
     }
 }

@@ -7,17 +7,18 @@ import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import it.unimi.dsi.fastutil.shorts.ShortOpenHashSet;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.util.math.SectionPos;
-import net.minecraft.world.World;
-import net.minecraft.world.chunk.ChunkStatus;
-import net.minecraft.world.chunk.IChunk;
-import net.minecraft.world.chunk.IChunkLightProvider;
-import net.minecraft.world.chunk.NibbleArray;
-import net.minecraft.world.lighting.IWorldLightListener;
-import net.minecraft.world.server.ServerWorld;
-import net.minecraft.world.server.TicketType;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.ChunkStatus;
+import net.minecraft.world.level.chunk.DataLayer;
+import net.minecraft.world.level.chunk.LightChunkGetter;
+import net.minecraft.world.level.lighting.LayerLightEventListener;
+import net.minecraft.world.level.lighting.LevelLightEngine;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,21 +30,21 @@ import java.util.function.IntConsumer;
 
 public final class StarLightInterface {
 
-    public static final TicketType<ChunkPos> CHUNK_WORK_TICKET = TicketType.create("starlight_chunk_work_ticket", (p1, p2) -> Long.compare(p1.asLong(), p2.asLong()));
+    public static final TicketType<ChunkPos> CHUNK_WORK_TICKET = TicketType.create("starlight_chunk_work_ticket", (p1, p2) -> Long.compare(p1.toLong(), p2.toLong()));
 
     /**
      * Can be {@code null}, indicating the light is all empty.
      */
-    protected final World world;
-    protected final IChunkLightProvider lightAccess;
+    protected final Level world;
+    protected final LightChunkGetter lightAccess;
 
     protected final ArrayDeque<SkyStarLightEngine> cachedSkyPropagators;
     protected final ArrayDeque<BlockStarLightEngine> cachedBlockPropagators;
 
     protected final LightQueue lightQueue = new LightQueue(this);
 
-    protected final IWorldLightListener skyReader;
-    protected final IWorldLightListener blockReader;
+    protected final LayerLightEventListener skyReader;
+    protected final LayerLightEventListener blockReader;
     protected final boolean isClientSide;
 
     protected final int minSection;
@@ -51,12 +52,14 @@ public final class StarLightInterface {
     protected final int minLightSection;
     protected final int maxLightSection;
 
-    public StarLightInterface(final IChunkLightProvider lightAccess, final boolean hasSkyLight, final boolean hasBlockLight) {
+    public final LevelLightEngine lightEngine;
+
+    public StarLightInterface(final LightChunkGetter lightAccess, final boolean hasSkyLight, final boolean hasBlockLight, final LevelLightEngine lightEngine) {
         this.lightAccess = lightAccess;
-        this.world = lightAccess == null ? null : (World)lightAccess.getWorld();
+        this.world = lightAccess == null ? null : (Level)lightAccess.getLevel();
         this.cachedSkyPropagators = hasSkyLight && lightAccess != null ? new ArrayDeque<>() : null;
         this.cachedBlockPropagators = hasBlockLight && lightAccess != null ? new ArrayDeque<>() : null;
-        this.isClientSide = !(this.world instanceof ServerWorld);
+        this.isClientSide = !(this.world instanceof ServerLevel);
         if (this.world == null) {
             this.minSection = 0;
             this.maxSection = 15;
@@ -68,11 +71,38 @@ public final class StarLightInterface {
             this.minLightSection = WorldUtil.getMinLightSection(this.world);
             this.maxLightSection = WorldUtil.getMaxLightSection(this.world);
         }
-        this.skyReader = !hasSkyLight ? IWorldLightListener.Dummy.INSTANCE : new IWorldLightListener() {
+        this.lightEngine = lightEngine;
+        this.skyReader = !hasSkyLight ? LayerLightEventListener.DummyLightLayerEventListener.INSTANCE : new LayerLightEventListener() {
             @Override
-            public NibbleArray getData(final SectionPos pos) {
-                final IChunk chunk = StarLightInterface.this.getAnyChunkNow(pos.getX(), pos.getZ());
-                if (chunk == null || (!StarLightInterface.this.isClientSide && !chunk.hasLight()) || !chunk.getStatus().isAtLeast(ChunkStatus.LIGHT)) {
+            public void checkBlock(final BlockPos blockPos) {
+                StarLightInterface.this.lightEngine.checkBlock(blockPos.immutable());
+            }
+
+            @Override
+            public void onBlockEmissionIncrease(final BlockPos blockPos, final int i) {
+                // skylight doesn't care
+            }
+
+            @Override
+            public boolean hasLightWork() {
+                // not really correct...
+                return StarLightInterface.this.hasUpdates();
+            }
+
+            @Override
+            public int runUpdates(final int i, final boolean bl, final boolean bl2) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void enableLightSources(final ChunkPos chunkPos, final boolean bl) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public DataLayer getDataLayerData(final SectionPos pos) {
+                final ChunkAccess chunk = StarLightInterface.this.getAnyChunkNow(pos.getX(), pos.getZ());
+                if (chunk == null || (!StarLightInterface.this.isClientSide && !chunk.isLightCorrect()) || !chunk.getStatus().isOrAfter(ChunkStatus.LIGHT)) {
                     return null;
                 }
 
@@ -90,13 +120,13 @@ public final class StarLightInterface {
             }
 
             @Override
-            public int getLightFor(final BlockPos blockPos) {
+            public int getLightValue(final BlockPos blockPos) {
                 final int x = blockPos.getX();
                 int y = blockPos.getY();
                 final int z = blockPos.getZ();
 
-                final IChunk chunk = StarLightInterface.this.getAnyChunkNow(x >> 4, z >> 4);
-                if (chunk == null || (!StarLightInterface.this.isClientSide && !chunk.hasLight()) || !chunk.getStatus().isAtLeast(ChunkStatus.LIGHT)) {
+                final ChunkAccess chunk = StarLightInterface.this.getAnyChunkNow(x >> 4, z >> 4);
+                if (chunk == null || (!StarLightInterface.this.isClientSide && !chunk.isLightCorrect()) || !chunk.getStatus().isOrAfter(ChunkStatus.LIGHT)) {
                     return 15;
                 }
 
@@ -170,10 +200,36 @@ public final class StarLightInterface {
                 StarLightInterface.this.sectionChange(pos, notReady);
             }
         };
-        this.blockReader = !hasBlockLight ? IWorldLightListener.Dummy.INSTANCE : new IWorldLightListener() {
+        this.blockReader = !hasBlockLight ? LayerLightEventListener.DummyLightLayerEventListener.INSTANCE : new LayerLightEventListener() {
             @Override
-            public NibbleArray getData(final SectionPos pos) {
-                final IChunk chunk = StarLightInterface.this.getAnyChunkNow(pos.getX(), pos.getZ());
+            public void checkBlock(final BlockPos blockPos) {
+                StarLightInterface.this.lightEngine.checkBlock(blockPos.immutable());
+            }
+
+            @Override
+            public void onBlockEmissionIncrease(final BlockPos blockPos, final int i) {
+                this.checkBlock(blockPos);
+            }
+
+            @Override
+            public boolean hasLightWork() {
+                // not really correct...
+                return StarLightInterface.this.hasUpdates();
+            }
+
+            @Override
+            public int runUpdates(final int i, final boolean bl, final boolean bl2) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void enableLightSources(final ChunkPos chunkPos, final boolean bl) {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public DataLayer getDataLayerData(final SectionPos pos) {
+                final ChunkAccess chunk = StarLightInterface.this.getAnyChunkNow(pos.getX(), pos.getZ());
 
                 if (chunk == null || pos.getY() < StarLightInterface.this.minLightSection || pos.getY() > StarLightInterface.this.maxLightSection) {
                     return null;
@@ -183,7 +239,7 @@ public final class StarLightInterface {
             }
 
             @Override
-            public int getLightFor(final BlockPos blockPos) {
+            public int getLightValue(final BlockPos blockPos) {
                 final int cx = blockPos.getX() >> 4;
                 final int cy = blockPos.getY() >> 4;
                 final int cz = blockPos.getZ() >> 4;
@@ -192,7 +248,7 @@ public final class StarLightInterface {
                     return 0;
                 }
 
-                final IChunk chunk = StarLightInterface.this.getAnyChunkNow(cx, cz);
+                final ChunkAccess chunk = StarLightInterface.this.getAnyChunkNow(cx, cz);
 
                 if (chunk == null) {
                     return 0;
@@ -208,16 +264,16 @@ public final class StarLightInterface {
 
             @Override
             public void updateSectionStatus(final SectionPos pos, final boolean notReady) {
-                return; // block engine doesn't care
+                StarLightInterface.this.sectionChange(pos, notReady);
             }
         };
     }
 
-    public IWorldLightListener getSkyReader() {
+    public LayerLightEventListener getSkyReader() {
         return this.skyReader;
     }
 
-    public IWorldLightListener getBlockReader() {
+    public LayerLightEventListener getBlockReader() {
         return this.blockReader;
     }
 
@@ -225,7 +281,7 @@ public final class StarLightInterface {
         return this.isClientSide;
     }
 
-    public IChunk getAnyChunkNow(final int chunkX, final int chunkZ) {
+    public ChunkAccess getAnyChunkNow(final int chunkX, final int chunkZ) {
         if (this.world == null) {
             // empty world
             return null;
@@ -237,11 +293,11 @@ public final class StarLightInterface {
         return !this.lightQueue.isEmpty();
     }
 
-    public World getWorld() {
+    public Level getWorld() {
         return this.world;
     }
 
-    public IChunkLightProvider getLightAccess() {
+    public LightChunkGetter getLightAccess() {
         return this.lightAccess;
     }
 
@@ -309,7 +365,7 @@ public final class StarLightInterface {
         return this.lightQueue.queueSectionChange(pos, newEmptyValue);
     }
 
-    public void forceLoadInChunk(final IChunk chunk, final Boolean[] emptySections) {
+    public void forceLoadInChunk(final ChunkAccess chunk, final Boolean[] emptySections) {
         final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
         final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
 
@@ -343,7 +399,7 @@ public final class StarLightInterface {
         }
     }
 
-    public void lightChunk(final IChunk chunk, final Boolean[] emptySections) {
+    public void lightChunk(final ChunkAccess chunk, final Boolean[] emptySections) {
         final SkyStarLightEngine skyEngine = this.getSkyLightEngine();
         final BlockStarLightEngine blockEngine = this.getBlockLightEngine();
 
@@ -499,7 +555,7 @@ public final class StarLightInterface {
 
         public synchronized CompletableFuture<Void> queueBlockChange(final BlockPos pos) {
             final ChunkTasks tasks = this.chunkTasks.computeIfAbsent(CoordinateUtils.getChunkKey(pos), ChunkTasks::new);
-            tasks.changedPositions.add(pos.toImmutable());
+            tasks.changedPositions.add(pos.immutable());
             return tasks.onComplete;
         }
 

@@ -2,11 +2,10 @@ buildscript {
     repositories {
         maven { url = 'https://files.minecraftforge.net/maven' }
         maven { url = 'https://repo.spongepowered.org/maven' }
-        jcenter()
         mavenCentral()
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '3.+', changing: true
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1+', changing: true
         classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
     }
 }
@@ -17,10 +16,10 @@ group = "ca.spottedleaf.${modid}-forge"
 version = "${mod_version}"
 archivesBaseName = "${modid}"
 
-sourceCompatibility = targetCompatibility = compileJava.sourceCompatibility = compileJava.targetCompatibility = '1.8'
+java.toolchain.languageVersion = JavaLanguageVersion.of(16)
 
 minecraft {
-    mappings channel: "snapshot", version: "${mappings_version}"
+    mappings channel: "${mappings_channel}", version: "${mappings_version}"
     // makeObfSourceJar = false // an Srg named sources jar is made by default. uncomment this to disable.
 
     accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
@@ -100,7 +99,9 @@ jar {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
-    compile 'org.spongepowered:mixin:0.8'
+    // TODO check this stupid hack on forge update
+    implementation('cpw.mods:securejarhandler') { version { strictly '0.9.45' } }
+    compileOnly 'org.spongepowered:mixin:0.8'
 }
 
 apply plugin: 'org.spongepowered.mixin'
@@ -113,10 +114,12 @@ mixin {
 processResources {
     filesMatching('*') {
         expand(
-                'modid': project.property('modid'),
+                'modid':project.property('modid'),
                 'mod_version': project.property('mod_version'),
                 'forge_version': project.property('forge_version'),
+                'forge_version_major': project.property('forge_version_major'),
                 'mc_version': project.property('mc_version'),
+                'mappings_channel': project.property('mappings_channel'),
                 'mappings_version': project.property('mappings_version')
         )
     }
