@@ -99,8 +99,6 @@ jar {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
-    // TODO check this stupid hack on forge update
-    implementation('cpw.mods:securejarhandler') { version { strictly '0.9.45' } }
     compileOnly 'org.spongepowered:mixin:0.8'
 }
 
