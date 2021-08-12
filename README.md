@@ -1,11 +1,11 @@
 Starlight (Fabric) (BETA)
 ==
-Fabric mod for completely rewriting the vanilla light engine.
+Fabric mod for completely rewriting Minecraft's vanilla light engine.
 
 ## Known Issues (This is why we're in BETA)
-Check out [The issues tab](https://github.com/Spottedleaf/Starlight/issues)
+Check out [the issues tab](https://github.com/Spottedleaf/Starlight/issues).
 Please note that since this is a beta, there could be some light corrupting issues. 
-Do not use if you do not want to take that risk!
+Do not use if you don't want to take that risk!
 
 At this point in Starlight's development, I expect more problems with mod conflicts than
 with lighting issues, though.
@@ -19,11 +19,11 @@ chunk generation speed and FPS drops when people are building on large platforms
 also fixes [MC-162253](https://bugs.mojang.com/browse/MC-162253), which only affects
 lag spikes specifically from lighting.
 An increase in chunk generation speed can also negatively affect FPS by making the client 
-render more chunks per frame. However, I only noticed this effect, even on non-optimal hardware,
-when generating amplified worlds which see a very significant chunk generation speed uplift.
+render more chunks per frame. However, I only noticed this effect - even on non-optimal hardware - 
+when generating amplified worlds, which see a very significant chunk generation speed uplift.
 
 The graph below shows how much time the light engine was active while generating 10404 chunks:
-![Light engine time chunk generation Graph](https://i.imgur.com/5aI8Eaf.png)
+![Light engine time chunk generation graph](https://i.imgur.com/5aI8Eaf.png)
 - Tested via [LightBench](https://github.com/Spottedleaf/lightbench)
 - World seed: vanillakekw
 - CPU: Ryzen 9 5950X
@@ -63,12 +63,12 @@ changing Vanilla code.
 
 On inspection of the light engine code to see what was causing such
 regressions in performance, it became obvious that there were
-performance problems were everywhere in how Vanilla processed updates, 
+performance problems everywhere in how Vanilla processed updates.
 It seemed like Vanilla was optimised to try and reduce light updates, 
-but it came at the cost of slowing down each light update. So even 
+but that came at the cost of slowing down each light update. So even 
 when it did _fewer_ updates, it took more time.
 
-So, If I wanted to fix them I would effectively have to end 
-up rewriting most of the light engine, and at that point it's 
-easier to write a new one than rework the one old. The 
-Vanilla light engine simply had too many problems to fix.
+So if I wanted to fix them, I would effectively have to rewrite
+most of the light engine, and at that point it's 
+easier to write a new one than rework the old one. The 
+Vanilla light engine simply has too many problems to fix.

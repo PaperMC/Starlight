@@ -1,7 +1,7 @@
 Starlight Technical Details
 ==
 First and foremost, Starlight is a Vanilla-like light engine. I've seen
-some people say it's not, however just because Starlight is fast enough
+some people say it's not; however, just because Starlight is fast enough
 to defeat typical "light suppressors" does not mean I break Vanilla lighting.
 The end result of lighting with Starlight and Vanilla will be the same, and
 I have always and will always intend it to be that way. Any lighting difference
@@ -17,7 +17,7 @@ they affect Minecraft.
 
 
 ## Light propagation algorithm
-In order to discuss light propagation I first need to give a definition
+In order to discuss light propagation, I first need to give a definition
 for it. Light propagation is how a light engine takes
 a light level, a position, and maybe other parameters, and then
 propagates one of two things: An increase in light value to neighbours,
@@ -27,12 +27,12 @@ for their neighbours. Eventually no more changes are queued, which
 means the original light change(s) have been "propagated."
 
 While at first glance Vanilla and Starlight seem to propagate
-light exactly the same, especially given there are no differences
+light exactly the same, especially given that there are no differences
 in the end result, we take entirely different approaches. I'm going
-to first outline how Starlight propagates, and then a simplified version
+to first outline how Starlight propagates, and then outline a simplified version
 for Vanilla. Why a simplified version for Vanilla? Because Vanilla
 has quite a few complexities about propagating light decreases that in some
-cases will cause it to eliminate needless updates, however I don't
+cases will cause it to eliminate needless updates. I don't
 fully understand how it works, so it is not appropriate for me to explain it. 
 However, the simplified variant is good enough to understand key differences between 
 Starlight and Vanilla.
@@ -66,8 +66,8 @@ one that's even simpler than the Vanilla algorithm, and even more basic
 than even 1.12's light engine.
 
 I'm going to use the case of propagating block light increases to explain
-the fundamental algorithm. Light decreases are basically the same except
-the algorithm is modified a bit. The propagation is the same, it will
+the fundamental algorithm. Light decreases are basically the same, except
+the algorithm is modified a bit. The propagation is the same: it will
 track what level the neighbour should be, but instead of updating
 the neighbour to the target level it will do one of two things:
 1. If the neighbour's light value is less-than or equal to the
@@ -96,7 +96,7 @@ to propagate its new light value. The light will propagate in a
 BFS manner.
 
 Below is an example of the above algorithm used to propagate increases
-in a `World`
+in a `World`.
 ```java
 class Light {
     queue = ...; // Simple FIFO queue, like ArrayDeque
@@ -167,7 +167,7 @@ light and Vanilla propagates light.
 
 ### Vanilla propagation algorithm
 
-Vanilla's still uses a simple FIFO queue (for explanation purposes),
+Vanilla's algorithm still uses a simple FIFO queue (for explanation purposes),
 however instead of trying to propagate light levels to neighbours, it
 instead calculates the light level for a queued position FROM its neighbours.
 So now propagateIncreases would look something more like this:
@@ -236,7 +236,7 @@ In practice Vanilla has ordered queues by light level, so it always
 processes the highest value queued before any else, but for this
 simple example it doesn't matter. It also is far more complicated in its implementation,
 and it may not actually read from all neighbours. But for simplicity's sake
-we don't need to go over that, this is good enough for a basic comparison.
+we don't need to go over that, as this is good enough for a basic comparison.
 
 
 Like with Starlight, decreases are propagated by modifying the algorithm a bit.
@@ -246,8 +246,8 @@ if the recalculated block should be a skylight source.
 
 ### Propagation comparison
 
-Ok, so why is Starlight's better? It looks like they're both doing
-the same thing...
+"Ok, so why is Starlight's better? It looks like they're both doing
+the same thing..."
 
 Except they're not. Not even close. Vanilla is doing WAY more getLight/getState calls
 than Starlight. Why? Because for each block it updates, it is checking ALL 6
@@ -331,7 +331,7 @@ there is just air around. Finally, set a glass block in the chunk section you're
 This will prevent both light engines from de-initialising the light in the area,
 and force it to actually propagate increases and decreases. Then, in the _same
 chunk section_, place a glowstone block. Console should output the results.
-Remove the glowstone block. Again console will output the results. You should
+Remove the glowstone block. Again, console will output the results. You should
 ensure the light sets is exactly 4089, otherwise it implies the output was
 mixed with noise or wasn't the update you expected.
 
@@ -357,7 +357,7 @@ which is not counted in my test. It's certainly not the case that a read
 from that map is going to be faster than a `NibbleArray` read, so there's
 definitely hidden costs in this area. Speaking of hidden costs,
 Vanilla does quite a few more additional hashtable lookups _per light update_,
-which Starlight does NOT do. For example, it needs to a lookup to check
+which Starlight does NOT do. For example, it needs to do a lookup to check
 if the block it's about to update is in an initialised section, it needs
 to add the updated section to a set of changed sets, and it needs
 to do a hashtable lookup/remove per queued value process as the queue
@@ -365,10 +365,10 @@ isn't an array based FIFO queue, it's a `LongLinkedOpenHashSet` (this is
 because Vanilla can cancel pending light updates).
 
 In any case, Vanilla still fails to come close to Starlight. Comparing
-the block reads in the real test for increases shows Starlight did 12x less, and
-it did _at least_ 1.7 less light level reads (although see the above paragraph
-for why Vanilla probably did more). For decreases, Starlight did _44_ times less
-block reads and _at least_ 7.4 times less light gets. Again, there is
+the block reads in the real test for increases shows Starlight did 12x fewer, and
+it did _at least_ 1.7x fewer light level reads (although see the above paragraph
+for why Vanilla probably did more). For decreases, Starlight did _44x_ fewer
+block reads and _at least_ 7.4x fewer light gets. Again, there is
 additional logic not covered by these numbers in the Vanilla light engine.
 
 Ok, but do these numbers really matter for light propagation?
@@ -401,16 +401,16 @@ the bedrock platform was at.
 ![Block update at height graph](https://i.imgur.com/kKtbe9y.png)
 
 Below is a graph for placing a glowstone block on top of the bedrock platform
-(so that skylight had zero effect)
+(so that skylight had zero effect).
 ![Simple glowstone block update](https://i.imgur.com/yCNK602.png)
 
-Unsurprisingly Starlight propagated the changes the fastest, as these
+Unsurprisingly, Starlight propagated the changes the fastest, as these
 are pure light update propagation tests. This also proves that Starlight's
 propagation algorithm is indeed faster than Vanilla's, and it is faster
-by _a lot_. It is ~28 times faster than Vanilla in the glowstone remove test
-and is ~12 times faster than Vanilla in the glowstone place test.
-Starlight is also ~13 times faster at the block remove at y = 254 test
-and ~37 times faster than the block place test at y = 254 than Vanilla. So
+by _a lot_. It is ~28x faster than Vanilla in the glowstone remove test
+and is ~12x faster than Vanilla in the glowstone place test.
+Starlight is also ~13x faster at the block remove at y = 254 test
+and ~37x faster than the block place test at y = 254 than Vanilla. So
 Starlight is consistently faster than Vanilla in pure light propagation
 tests.
 
@@ -429,7 +429,7 @@ below and above. Take for example a world with grass at y = 254 and bedrock
 at y = 0. Only the light around the top and the bottom of the world
 actually matter - the sections inbetween will actually always be the same.
 
-The general rule imposed is that only light data (nibblearrays) that exists within 1 square
+The general rule imposed is that only light data (nibblearrays) that exists within a 1 square
 radius (`max(abs(x2 - x1), abs(y2 - y1), abs(z2 - z1))`) of a non-empty
 chunk section is going to be initialised - no other light data will exist.
 If a section turns empty, then the surrounding data is possibly removed to
@@ -440,12 +440,12 @@ in the sections that exist.
 Starlight adheres to these rules and properly propagates skylight through
 sections, even if they don't exist - just like Vanilla. I've also chosen
 to document this behavior because it is by far the most complicated
-aspect of the new light engine principles, and it is critical to understand
-this principle to understand how lighting should work in modern Minecraft.
+aspect of the new light engine principles, and understanding this principle
+is critical to understand how lighting should work in modern Minecraft.
 
 ## Chunk lighting algorithms
 The next important case to consider is chunk lighting. Starlight and Vanilla
-do block chunk lighting basically the same; we iterate over the light sources in
+do block chunk lighting in basically the same manner; we iterate over the light sources in
 the chunk and shove them into the light propagator algorithm. Then,
 an edge check is performed to bring in light from neighbours. Edge checks
 are rather simple: does the light value for the position match up with what
@@ -461,7 +461,7 @@ algorithm in Starlight does not set up light sources, unlike Vanilla's.
 ### Skylighting in Starlight
 Starlight will simply start from one block above the highest non-empty
 chunk section and try to "propagate" skylight downwards. The logic is
-fairly simple, skylight source can propagate through a block if its
+fairly simple: skylight source can propagate through a block if its
 opacity is 0 (like air or glass) and the block is not conditionally
 opaque (does it need to check its shape to see if lighting can pass) in
 the +y direction on the block. From there it will just shove all the
@@ -470,7 +470,7 @@ lighting sources into the light propagator algorithm and run it.
 Starlight sets up light sources very efficiently on Fabric though. Instead of
 actually iterating from top down and reading the blocks, it creates and
 uses a bitset stored on the chunk sections themselves to note what blocks
-are guaranteed opacity 0. So it can determine and use a heightmap for setting
+are guaranteed opacity 0 so that it can determine and use a heightmap for setting
 up sources. Starlight's light propagator can also be told for a given
 queued entry what neighbours it should check, and of course you can
 use the heightmap to figure out what neighbours are going to be level
@@ -478,7 +478,7 @@ use the heightmap to figure out what neighbours are going to be level
 even queueing the position. For example, for lighting a desert
 (just flat terrain, mostly) I noticed the queued levels to propagate
 were only about ~300, whereas on the Tuinity implementation they could
-be ~2000 or more. There was real benchmarking decisions behind making
+be ~2000 or more. There were real benchmarking decisions behind making
 these changes. Tux did some async profiling for me, and showed me these results:
 
 ![Profiling Results 1](https://cdn.discordapp.com/attachments/712294045312876586/772876777189802014/Screenshot_from_2020-11-02_12-35-57.png)
@@ -493,7 +493,7 @@ were simply not propagating light at all, since their neighbours were most
 likely full 15 as well.
 
 Effectively all the changes come down to the fact that Starlight needs to
-manually setup light sources, and of course by manually setting them up
+manually set up light sources, and of course by manually setting them up,
 optimisations can be made. Instead of relying on the propagator, which is
 going to have to do additional block reads and light reads, it can
 simply do the minimum number of block reads per chunk. On Fabric, it
@@ -509,7 +509,7 @@ light data management).
 To explain how that procedure even lights a chunk:
 It might be hard to think about, but the edge checks on the light data
 above the highest non-empty section will eventually turn that light data
-section into full 15 which will then propagate into the sections below. So
+section into full 15, which will then propagate into the sections below. So
 while it's not as straightforward to see as Starlight, it gets the job done.
 
 ### Chunk lighting algorithm comparison
@@ -521,10 +521,10 @@ initialise the skylight sources in the chunk. Meanwhile, Vanilla has to
 use the inefficient propagator to do it. So while it might not seem
 like a lot, typically chunk sections are only going to ever need two or three
 sections worth of light propagations to become lit - but adding on
-an extra section for isn't very efficient.
+an extra section isn't very efficient.
 
 Vanilla will also propagate skylight into chunks that are not lit. So it's also
-going to do light propagations that will be later overwritten. Starlight will
+going to do light propagations that will later be overwritten. Starlight will
 not propagate into unlit chunks. This is a concern only for writing data to
 disk, but this is covered later.
 
@@ -536,8 +536,8 @@ To show the performance difference between Starlight and Vanilla for
 chunk light generation, I wrote a simple tool to test it here:
 https://github.com/Spottedleaf/lightbench
 
-Please note that when comparing these results from the old Starlight README
-and now that I've completely switched systems. Back then I ran an i9-8750H processor
+Please note when comparing these results from the old Starlight README
+that now that I've completely switched systems. Back then I ran an i9-8750H processor
 locked at 2.2GHz (turbo disabled), and now I have a Ryzen 5950X.
 
 Tested versions:
@@ -547,7 +547,7 @@ Tested versions:
 
 Results:
 ![Graph](https://i.imgur.com/5aI8Eaf.png)
-The graph above shows how much time the light engine was active
+The graph above shows how much time the light engine was active for
 while generating 10404 chunks.
 
 ![Graph 2](https://i.imgur.com/eukEXY6.png)
@@ -585,7 +585,7 @@ Note that the explanations and summary of comparisons is included in each
 video's description. Please note, my CPU specs have since changed from January, 
 back then I ran an i9-8750H processor locked at 2.2GHz (turbo disabled), and
 now I have a Ryzen 9 5950X. So please be aware of that when comparing 
-the old benchmarks I've done and the new. Description for each video
+the old benchmarks I've done and the new ones. The description for each video
 will say what version of software was tested.
 
 Comparing standard world gen:
@@ -600,7 +600,7 @@ Starlight:
 https://www.youtube.com/watch?v=UMuSegBIBuo
 
 In summary, Starlight significantly reduced the amount
-of time to generate the world. 
+of time used to generate the world. 
 
 [MC-162253](https://bugs.mojang.com/browse/MC-162253):
 
@@ -628,7 +628,7 @@ https://www.youtube.com/watch?v=WczW8KmcReg
 
 In summary, Starlight significantly reduced the amount
 of time to generate the world. It generated in almost
-the same time as the standard world gen, just 3 seconds
+the same amount of time as the standard world gen, just 3 seconds
 longer. 
 
 Block changes at maximum world height:
@@ -642,7 +642,7 @@ https://www.youtube.com/watch?v=twBL2DkJWM4
 Starlight:
 https://www.youtube.com/watch?v=5nVYjedJz-U
 
-In summary Starlight basically eliminated the massive frame stall
+In summary, Starlight basically eliminated the massive frame stall
 from the piston causing the light update at max world height.
 
 This about concludes the major improvements Starlight does to the light engine.
@@ -658,8 +658,8 @@ You might have noticed Starlight modifies the format of light on disk.
 It does this for two reasons: It needs to store whether a skylight data
 section is uninitialised or absent (Vanilla conflates the two) and
 Starlight does not propagate light into chunks not marked as lit. However,
-in modifying the data stored, it also marks the chunk as "unlit." and add
-its own special tag for whether the chunk is it. To Vanilla the data will look
+in modifying the data stored, it also marks the chunk as "unlit" and adds
+its own special tag for whether the chunk is lit. To Vanilla the data will look
 like the chunk needs lighting, and to Starlight it will look "lit." So
 the world save format is compatible if saved in Starlight, as it will force
 Vanilla to relight the chunk. If the world is saved in Vanilla then
@@ -676,10 +676,10 @@ I don't expect any changes Starlight does to actually make FPS improve
 on the average - it just helps with those edge cases at maximum world
 heights.
 
-### Faster Chunk Loading and Generation
+### Faster chunk Loading and Generation
 While it might seem that faster chunk loading/generation is only a good thing,
 it really isn't in all cases. For example, the amplified world gen test showed
-this. Chunk gen was considerably faster, however: The video clearly shows the
+this. Chunk gen was considerably faster, however: The video clearly shows that the
 client is stuttering a lot more! As expected, when you throw more chunks
 at the client, and then combine it with Mojang's top tier rendering code,
 you get a bottleneck. Stuttering is no fun, probably much better on the
@@ -692,9 +692,9 @@ it's not really doing that, so this problem will happen more on Starlight. So
 while it's not technically my fault, it will happen more with MY changes, so
 it should be noted.
 
-However, if the client sided problems are resolved, it would mean having
-larger world heights in terrain generation can be achieved without sacrificing
-significant performance. Especially now with Minecraft looking to
+However, if the client sided problems are resolved, it would mean larger
+world heights in terrain generation can be achieved without sacrificing
+significant performance, especially now with Minecraft looking to
 change world height limits.
 
 ### Conclusion of changes to FPS
@@ -702,8 +702,8 @@ change world height limits.
 So overall I do not expect Starlight to improve FPS at all. If anything, it
 will harm it due to the stuttering caused by generating and loading chunks faster.
 
-## Mod Compatibility
-Unsurprisingly a cutting edge change to Minecraft initially designed for
+## Mod compatibility
+Unsurprisingly, a cutting edge change to Minecraft initially designed for
 Bukkit-based servers has mod compatibility problems on platforms like
 Forge and Fabric. Any mod that relies on hooking directly into the
 light engine will be broken by Starlight, since Starlight is a complete
@@ -717,15 +717,15 @@ reporting.
 
 # Conclusion
 
-Starlight is the fastest light engine implementation in Minecraft currently.
-However, that has not come without its price. It will break some mods, and reveals 
+Starlight is currently the fastest light engine implementation in Minecraft.
+However, that has not come without a price. It will break some mods, and reveals 
 some stuttering problems on the client. So which light engine should you use?
 I would personally recommend against using Vanilla at the minimum, since 
 Phosphor is a proven improvement, and it fixes performance problems 
 like MC-162253. So it comes down to Phosphor or Starlight. In terms of 
 mod compatibility, Phosphor is going to be better since it modifies the
 light engine. Depending on your computer though, and terrain, you might just end up
-seeing more stutters on Starlight. So it depends, I would personally recommend 
+seeing more stutters on Starlight. So, it depends. I would personally recommend 
 testing both. 
 
 This recommendation changes for larger scale (player wise) servers, however. 
@@ -733,8 +733,8 @@ Larger scale servers are going to suffer more often because of how slow
 the light engine is. If the light engine falls behind for any reason and
 continues to fall behind, and the server is restarted, then pending light
 updates are lost and can cause broken lighting. Starlight fixes this
-by first being faster and so very unlikely to fall behind, and secondly
-by preventing chunks from saved when they have pending light updates. Larger
+by 1. being faster and so being very unlikely to fall behind, and 2.
+by preventing chunks from being saved when they have pending light updates. Larger
 scale servers also have more people exploring, which is going to put a higher
 stress on chunk generation, which Starlight will help with.
 
