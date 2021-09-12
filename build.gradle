@@ -11,9 +11,23 @@ buildscript {
 }
 
 apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'org.spongepowered.mixin'
 
-group = "ca.spottedleaf.${modid}-forge"
-version = "${mod_version}"
+/*
+ * Gets the version name from the latest Git tag
+ */
+// https://stackoverflow.com/questions/28498688/gradle-script-to-autoversion-and-include-the-commit-hash-in-android
+def getGitCommit = { ->
+    def stdout = new ByteArrayOutputStream()
+    exec {
+        commandLine 'git', 'rev-parse', '--short', 'HEAD'
+        standardOutput = stdout
+    }
+    return stdout.toString().trim()
+}
+
+group = "ca.spottedleaf.${modid}"
+version = "${mod_version}" + "+forge." + getGitCommit()
 archivesBaseName = "${modid}"
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(16)
@@ -99,10 +113,8 @@ jar {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
-    compileOnly 'org.spongepowered:mixin:0.8'
+    annotationProcessor "org.spongepowered:mixin:0.8.4:processor"
 }
-
-apply plugin: 'org.spongepowered.mixin'
 
 mixin {
     add sourceSets.main, "${modid}.refmap.json"
@@ -110,10 +122,11 @@ mixin {
 
 
 processResources {
-    filesMatching('*') {
+    filesMatching("**/mods.toml") {
         expand(
                 'modid':project.property('modid'),
                 'mod_version': project.property('mod_version'),
+                'version': project.version,
                 'forge_version': project.property('forge_version'),
                 'forge_version_major': project.property('forge_version_major'),
                 'mc_version': project.property('mc_version'),

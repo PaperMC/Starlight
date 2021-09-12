@@ -1,15 +1,17 @@
 modLoader = "javafml"
-loaderVersion = "[37,)"
+loaderVersion = "[${forge_version_major},)"
 license = "LGPL-3.0-only"
 
 [[mods]]
  modId = "starlight"
- version = "1.0.0-RC3"
+ version = "${version}"
  displayName = "Starlight"
  authors = "Spottedleaf"
  description = '''
     Rewrites the light engine to fix lighting performance and lighting errors
  '''
+ logoFile = "logo.png"
+ displayURL = "https://www.curseforge.com/minecraft/mc-mods/starlight-forge"
 
  [[dependencies.starlight]]
   modId = "forge"

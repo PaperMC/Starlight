@@ -1,14 +1,13 @@
-Starlight (Forge) (BETA)
+Starlight (Forge)
 ==
 Forge mod for completely rewriting the vanilla light engine.
 
-## Known Issues (This is why we're in BETA)
-Check out [The issues tab](https://github.com/Spottedleaf/Starlight/issues)
-Please note that since this is a beta, there could be some light corrupting issues. 
-Do not use if you do not want to take that risk!
+## Known Issues
+At this point in Starlight's development, I expect problems with mod conflicts.
 
-At this point in Starlight's development, I expect more problems with mod conflicts than
-with lighting issues, though.
+## Download
+[CurseForge (Forge)](https://www.curseforge.com/minecraft/mc-mods/starlight-forge)
+[Modrinth (Forge)](https://modrinth.com/mod/starlight-forge)
 
 ## Contact
 [Discord](https://discord.gg/tuinity)
