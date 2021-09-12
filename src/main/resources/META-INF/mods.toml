@@ -14,7 +14,7 @@ license = "LGPL-3.0-only"
  [[dependencies.starlight]]
   modId = "forge"
   mandatory = true
-  versionRange = "[37,)"
+  versionRange = "[37.0.59,)"
   ordering = "NONE"
   side = "BOTH"
 

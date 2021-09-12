@@ -31,7 +31,7 @@ minecraft {
             workingDirectory project.file('run')
 
             // add mixins
-            arg "-mixin.config=" + modid + ".mixins.json"
+            arg "--mixin.config=" + modid + ".mixins.json"
 
             // Recommended logging data for a userdev environment
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
@@ -50,7 +50,7 @@ minecraft {
             workingDirectory project.file('run')
 
             // add mixins
-            arg "-mixin.config=" + modid + ".mixins.json"
+            arg "--mixin.config=" + modid + ".mixins.json"
 
             // Recommended logging data for a userdev environment
             property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
