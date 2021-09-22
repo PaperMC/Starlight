@@ -669,38 +669,74 @@ from Vanilla to Starlight.
 
 ## FPS Impact
 
-### Block changes
-The amount of time to propagate lighting is pretty minimal except for
-high altitude scenarios. However, most people aren't up that high, so
-I don't expect any changes Starlight does to actually make FPS improve
-on the average - it just helps with those edge cases at maximum world
-heights.
+The ways Starlight affects FPS can be broken down into two areas: 
+light engine time on the client (block editing, chunk loading)
+and chunk load rate for the client.
 
-### Faster Chunk Loading and Generation
-While it might seem that faster chunk loading/generation is only a good thing,
-it really isn't in all cases. For example, the amplified world gen test showed
-this. Chunk gen was considerably faster, however: The video clearly shows the
-client is stuttering a lot more! As expected, when you throw more chunks
-at the client, and then combine it with Mojang's top tier rendering code,
-you get a bottleneck. Stuttering is no fun, probably much better on the
-user end to just have chunks load slower if it means their FPS stays
-smooth.
+### Light engine time on the client
 
-There's no reason the client cannot be simply improved to
-simply limit the amount of chunks it tries to render per frame. As it stands,
-it's not really doing that, so this problem will happen more on Starlight. So
-while it's not technically my fault, it will happen more with MY changes, so
-it should be noted.
+I have released a new version of [Lightbench](https://github.com/Spottedleaf/lightbench) 
+(1.0.2) which will render light engine time to the F3 frame time graph. It 
+can be used to measure relative performance between light engines. It renders
+the time as a black bar over the frame time bar.
 
-However, if the client sided problems are resolved, it would mean having
-larger world heights in terrain generation can be achieved without sacrificing
-significant performance. Especially now with Minecraft looking to
-change world height limits.
+#### Block editing
+The graphs show a clear improvement for all kinds of block breaking. 
+So if you are in an environment with significant amounts of block editing,
+Starlight will likely improve FPS - but only by the amount the light
+engine was taking up, which is going to depend on what kind of blocks,
+how many blocks, how often, height difference to ground, etc...
 
-### Conclusion of changes to FPS
+#### Chunk loading
 
-So overall I do not expect Starlight to improve FPS at all. If anything, it
-will harm it due to the stuttering caused by generating and loading chunks faster.
+Starlight, unlike the Vanilla based light engines, does not perform _any work_ for loading
+a chunk into the lighting engine. The light engine time from loading a chunk
+should be _zero_. 
+
+Here's a comparison for all light engines on 1.16 using Lightbench to show
+the light engine times per frame (the black bar in the frame graph):
+- [Vanilla](https://www.youtube.com/watch?v=rE-GMzQ7bq0)
+- [Phosphor](https://www.youtube.com/watch?v=PYKcAI_ethE)
+- [Starlight](https://www.youtube.com/watch?v=vdatf9vGOeo)
+
+I limited the FPS to 60 for all tests so that the light engine times can be seen
+and compared properly.
+
+But that's only half of the story for chunk loading.
+
+### Chunk load rate for the client
+
+The client must render chunks sent to them, and so it is expected the 
+more chunks it receives the more rendering work it has to do. 
+Starlight increases chunk generation rates because the light engine
+is the bottleneck for chunk generation in 1.16/1.17. Thus, in scenarios
+where players are generating a significant number of chunks, Starlight
+is going to cause FPS problems. See the Amplified world gen conversion videos
+for a good example.
+
+But this only concerns chunk generation, and it only concerns chunk generation
+in 1.16/1.17 _in the overworld_. So this will mostly be restricted to 
+elytra/creative/spectator flying in the overworld.
+
+## Overall FPS impact
+
+It can be broken down into 3 categories:
+
+1. You're editing a massive amount of blocks constantly (or are editing at y-level ~255)
+ 
+ Starlight will likely help.
+
+2. You're flying around loading/generating chunks
+
+ Starlight is likely going to cause frame time spikes if the chunks are generating, 
+ if loading possibly an improvement (but small).
+
+3. None of the above
+ 
+ Don't expect any changes.
+
+So unless you're in category #1 strictly, don't look for Starlight for fps 
+improvements, you will not find anything worthwhile.
 
 ## Mod Compatibility
 Unsurprisingly a cutting edge change to Minecraft initially designed for
