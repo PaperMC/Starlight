@@ -5,7 +5,6 @@ import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.util.IntegerUtil;
 import ca.spottedleaf.starlight.common.util.WorldUtil;
-import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import it.unimi.dsi.fastutil.shorts.ShortIterator;
@@ -34,8 +33,6 @@ import java.util.function.IntConsumer;
 public abstract class StarLightEngine {
 
     protected static final BlockState AIR_BLOCK_STATE = Blocks.AIR.defaultBlockState();
-
-    protected static final LevelChunkSection EMPTY_CHUNK_SECTION = new LevelChunkSection(0);
 
     protected static final AxisDirection[] DIRECTIONS = AxisDirection.values();
     protected static final AxisDirection[] AXIS_DIRECTIONS = DIRECTIONS;
@@ -230,7 +227,7 @@ public abstract class StarLightEngine {
     protected final void setBlocksForChunkInCache(final int chunkX, final int chunkZ, final LevelChunkSection[] sections) {
         for (int cy = this.minLightSection; cy <= this.maxLightSection; ++cy) {
             this.setChunkSectionInCache(chunkX, cy, chunkZ,
-                    sections == null ? null : (cy >= this.minSection && cy <= this.maxSection ? (sections[cy - this.minSection] == null || sections[cy - this.minSection].isEmpty() ? EMPTY_CHUNK_SECTION : sections[cy - this.minSection]) : EMPTY_CHUNK_SECTION));
+                    sections == null ? null : (cy >= this.minSection && cy <= this.maxSection ? sections[cy - this.minSection] : null));
         }
     }
 
@@ -288,20 +285,20 @@ public abstract class StarLightEngine {
         final LevelChunkSection section = this.sectionCache[(worldX >> 4) + 5 * (worldZ >> 4) + (5 * 5) * (worldY >> 4) + this.chunkSectionIndexOffset];
 
         if (section != null) {
-            return section == EMPTY_CHUNK_SECTION ? AIR_BLOCK_STATE : section.getBlockState(worldX & 15, worldY & 15, worldZ & 15);
+            return section.hasOnlyAir() ? AIR_BLOCK_STATE : section.getBlockState(worldX & 15, worldY & 15, worldZ & 15);
         }
 
-        return null;
+        return AIR_BLOCK_STATE;
     }
 
     protected final BlockState getBlockState(final int sectionIndex, final int localIndex) {
         final LevelChunkSection section = this.sectionCache[sectionIndex];
 
         if (section != null) {
-            return section == EMPTY_CHUNK_SECTION ? AIR_BLOCK_STATE : section.states.get(localIndex);
+            return section.hasOnlyAir() ? AIR_BLOCK_STATE : section.states.get(localIndex);
         }
 
-        return null;
+        return AIR_BLOCK_STATE;
     }
 
     protected final int getLightLevel(final int worldX, final int worldY, final int worldZ) {
@@ -393,7 +390,7 @@ public abstract class StarLightEngine {
         final LevelChunkSection section = this.sectionCache[(worldX >> 4) + 5 * (worldZ >> 4) + (5 * 5) * (worldY >> 4) + this.chunkSectionIndexOffset];
 
         if (section != null) {
-            return section == EMPTY_CHUNK_SECTION ? ExtendedChunkSection.BLOCK_IS_TRANSPARENT :
+            return section.hasOnlyAir() ? ExtendedChunkSection.BLOCK_IS_TRANSPARENT :
                     ((ExtendedChunkSection)section).getKnownTransparency((worldY & 15) | ((worldX & 15) << 4) | ((worldZ & 15) << 8));
         }
 
@@ -405,7 +402,7 @@ public abstract class StarLightEngine {
         final LevelChunkSection section = this.sectionCache[sectionIndex];
 
         if (section != null) {
-            return section == EMPTY_CHUNK_SECTION ? ExtendedChunkSection.BLOCK_IS_TRANSPARENT : ((ExtendedChunkSection)section).getKnownTransparency(localIndex);
+            return section.hasOnlyAir() ? ExtendedChunkSection.BLOCK_IS_TRANSPARENT : ((ExtendedChunkSection)section).getKnownTransparency(localIndex);
         }
 
         return ExtendedChunkSection.BLOCK_IS_TRANSPARENT;
@@ -701,7 +698,7 @@ public abstract class StarLightEngine {
         final Boolean[] ret = new Boolean[sections.length];
 
         for (int i = 0; i < sections.length; ++i) {
-            if (sections[i] == null || sections[i].isEmpty()) {
+            if (sections[i] == null || sections[i].hasOnlyAir()) {
                 ret[i] = Boolean.TRUE;
             } else {
                 ret[i] = Boolean.FALSE;
@@ -780,7 +777,7 @@ public abstract class StarLightEngine {
                     continue;
                 }
                 final LevelChunkSection section = this.getChunkSection(chunkX, sectionIndex + this.minSection, chunkZ);
-                emptinessChanges[sectionIndex] = valueBoxed = section == null || section.isEmpty() ? Boolean.TRUE : Boolean.FALSE;
+                emptinessChanges[sectionIndex] = valueBoxed = section == null || section.hasOnlyAir() ? Boolean.TRUE : Boolean.FALSE;
             }
             chunkEmptinessMap[sectionIndex] = valueBoxed.booleanValue();
         }
@@ -848,7 +845,7 @@ public abstract class StarLightEngine {
                                     }
                                 } else {
                                     final LevelChunkSection section = this.getChunkSection(dx + dx2 + chunkX, y, dz + dz2 + chunkZ);
-                                    if (section != null && section != EMPTY_CHUNK_SECTION) {
+                                    if (section != null && !section.hasOnlyAir()) {
                                         allEmpty = false;
                                         break neighbour_search;
                                     }

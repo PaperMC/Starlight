@@ -96,7 +96,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             if (emptinessMap == null) {
                 // cannot delay nibble init for lit chunks, as we need to init to propagate into them.
                 final LevelChunkSection current = this.getChunkSection(chunkX, currY, chunkZ);
-                if (current == null || current == EMPTY_CHUNK_SECTION) {
+                if (current == null || current.hasOnlyAir()) {
                     continue;
                 }
             } else {
@@ -481,7 +481,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
         int highestNonEmptySection = this.maxSection;
         while (highestNonEmptySection == (this.minSection - 1) ||
-                sections[highestNonEmptySection - this.minSection] == null || sections[highestNonEmptySection - this.minSection].isEmpty()) {
+                sections[highestNonEmptySection - this.minSection] == null || sections[highestNonEmptySection - this.minSection].hasOnlyAir()) {
             this.checkNullSection(chunkX, highestNonEmptySection, chunkZ, false);
             // try propagate FULL to neighbours
 
@@ -743,19 +743,13 @@ public final class SkyStarLightEngine extends StarLightEngine {
         this.checkNullSection(worldX >> 4, startY >> 4, worldZ >> 4, extrudeInitialised);
 
         BlockState above = this.getBlockState(worldX, startY + 1, worldZ);
-        if (above == null) {
-            above = AIR_BLOCK_STATE;
-        }
 
         for (;startY >= (this.minLightSection << 4); --startY) {
             if ((startY & 15) == 15) {
                 // ensure this section is always checked
                 this.checkNullSection(worldX >> 4, startY >> 4, worldZ >> 4, extrudeInitialised);
             }
-            BlockState current = this.getBlockState(worldX, startY, worldZ);
-            if (current == null) {
-                current = AIR_BLOCK_STATE;
-            }
+            final BlockState current = this.getBlockState(worldX, startY, worldZ);
 
             final VoxelShape fromShape;
             if (((ExtendedAbstractBlockState)above).isConditionallyFullOpaque()) {

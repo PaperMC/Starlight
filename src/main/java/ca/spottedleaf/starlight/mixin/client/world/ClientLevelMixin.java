@@ -17,7 +17,8 @@ import java.util.function.Supplier;
 @Mixin(ClientLevel.class)
 public abstract class ClientLevelMixin extends Level implements ExtendedWorld {
 
-    @Shadow public abstract ClientChunkCache getChunkSource();
+    @Shadow
+    public abstract ClientChunkCache getChunkSource();
 
     protected ClientLevelMixin(final WritableLevelData writableLevelData, final ResourceKey<Level> resourceKey, final DimensionType dimensionType,
                                final Supplier<ProfilerFiller> supplier, final boolean bl, final boolean bl2, final long l) {

@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '0.8-SNAPSHOT'
+    id 'fabric-loom' version '0.10-SNAPSHOT'
     id 'maven-publish'
 }
 
@@ -52,8 +52,8 @@ tasks.withType(JavaCompile) {
     options.encoding = "UTF-8"
 }
 
-minecraft {
-    accessWidener "src/main/resources/starlight.accesswidener"
+loom {
+    accessWidenerPath = file("src/main/resources/starlight.accesswidener")
 }
 
 // Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task

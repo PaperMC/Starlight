@@ -6,7 +6,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
-import net.minecraft.network.protocol.game.ClientboundLevelChunkPacket;
+import net.minecraft.network.protocol.game.ClientboundLightUpdatePacketData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.ChunkStatus;
@@ -31,6 +31,9 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
 
     @Shadow
     private ClientLevel level;
+
+    @Shadow
+    protected abstract void applyLightData(final int chunkX, final int chunkZ, final ClientboundLightUpdatePacketData clientboundLightUpdatePacketData);
 
     /**
      * Re-route light update packet to our own logic
@@ -64,26 +67,25 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
 
     /**
      * Hook for loading in a chunk to the world
-     * Note that the new chunk can be merged into the previous one and the new chunk can fail to load
      * @author Spottedleaf
      */
-    @Inject(
-            method = "handleLevelChunk",
+    @Redirect(
+            method = "handleLevelChunkWithLight",
             at = @At(
-                    target = "Lnet/minecraft/client/multiplayer/ClientChunkCache;replaceWithPacketData(IILnet/minecraft/world/level/chunk/ChunkBiomeContainer;Lnet/minecraft/network/FriendlyByteBuf;Lnet/minecraft/nbt/CompoundTag;Ljava/util/BitSet;)Lnet/minecraft/world/level/chunk/LevelChunk;",
+                    target = "Lnet/minecraft/client/multiplayer/ClientPacketListener;queueLightUpdate(IILnet/minecraft/network/protocol/game/ClientboundLightUpdatePacketData;)V",
                     value = "INVOKE",
-                    ordinal = 0,
-                    shift = At.Shift.AFTER
+                    ordinal = 0
             )
     )
-    private void postChunkLoadHook(final ClientboundLevelChunkPacket clientboundLevelChunkPacket, final CallbackInfo ci) {
-        final int chunkX = clientboundLevelChunkPacket.getX();
-        final int chunkZ = clientboundLevelChunkPacket.getZ();
+    private void postChunkLoadHook(final ClientPacketListener clientPacketListener, final int chunkX, final int chunkZ,
+                                   final ClientboundLightUpdatePacketData clientboundLightUpdatePacketData) {
         final LevelChunk chunk = (LevelChunk)this.level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
         if (chunk == null) {
             // failed to load
             return;
         }
+        // load in light data from packet immediately
+        this.applyLightData(chunkX, chunkZ, clientboundLightUpdatePacketData);
         ((StarLightLightingProvider)this.level.getChunkSource().getLightEngine()).clientChunkLoad(new ChunkPos(chunkX, chunkZ), chunk);
     }
 }
