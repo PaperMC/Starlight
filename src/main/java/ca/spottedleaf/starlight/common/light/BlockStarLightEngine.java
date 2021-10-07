@@ -220,7 +220,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
             final LevelChunkSection[] sections = chunk.getSections();
             for (int sectionY = this.minSection; sectionY <= this.maxSection; ++sectionY) {
                 final LevelChunkSection section = sections[sectionY - this.minSection];
-                if (sections == null || section.hasOnlyAir()) {
+                if (section == null || section.hasOnlyAir()) {
                     // no sources in empty sections
                     continue;
                 }
