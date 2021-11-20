@@ -18,8 +18,8 @@ public abstract class ImposterProtoChunkMixin extends ProtoChunk implements Exte
     @Shadow
     private LevelChunk wrapped;
 
-    public ImposterProtoChunkMixin(final LevelChunk levelChunk) {
-        super(levelChunk.getPos(), UpgradeData.EMPTY, levelChunk, levelChunk.getLevel().registryAccess().registryOrThrow(Registry.BIOME_REGISTRY));
+    public ImposterProtoChunkMixin(final LevelChunk levelChunk, final boolean bl) {
+        super(levelChunk.getPos(), UpgradeData.EMPTY, levelChunk, levelChunk.getLevel().registryAccess().registryOrThrow(Registry.BIOME_REGISTRY), levelChunk.getBlendingData());
     }
 
     @Override

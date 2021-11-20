@@ -1,7 +1,6 @@
 package ca.spottedleaf.starlight.common.light;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
-import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.util.IntegerUtil;
 import ca.spottedleaf.starlight.common.util.WorldUtil;
@@ -384,28 +383,6 @@ public abstract class StarLightEngine {
 
     protected final void setEmptinessMapCache(final int chunkX, final int chunkZ, final boolean[] emptinessMap) {
         this.emptinessMapCache[chunkX + 5*chunkZ + this.chunkIndexOffset] = emptinessMap;
-    }
-
-    protected final long getKnownTransparency(final int worldX, final int worldY, final int worldZ) {
-        final LevelChunkSection section = this.sectionCache[(worldX >> 4) + 5 * (worldZ >> 4) + (5 * 5) * (worldY >> 4) + this.chunkSectionIndexOffset];
-
-        if (section != null) {
-            return section.hasOnlyAir() ? ExtendedChunkSection.BLOCK_IS_TRANSPARENT :
-                    ((ExtendedChunkSection)section).getKnownTransparency((worldY & 15) | ((worldX & 15) << 4) | ((worldZ & 15) << 8));
-        }
-
-        return ExtendedChunkSection.BLOCK_IS_TRANSPARENT;
-    }
-
-    // warn: localIndex = y | (x << 4) | (z << 8)
-    protected final long getKnownTransparency(final int sectionIndex, final int localIndex) {
-        final LevelChunkSection section = this.sectionCache[sectionIndex];
-
-        if (section != null) {
-            return section.hasOnlyAir() ? ExtendedChunkSection.BLOCK_IS_TRANSPARENT : ((ExtendedChunkSection)section).getKnownTransparency(localIndex);
-        }
-
-        return ExtendedChunkSection.BLOCK_IS_TRANSPARENT;
     }
 
     public static SWMRNibbleArray[] getFilledEmptyLight(final LevelHeightAccessor world) {

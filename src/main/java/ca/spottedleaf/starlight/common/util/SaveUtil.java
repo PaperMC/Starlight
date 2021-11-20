@@ -3,7 +3,6 @@ package ca.spottedleaf.starlight.common.util;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
-import ca.spottedleaf.starlight.common.util.WorldUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
@@ -18,7 +17,7 @@ public final class SaveUtil {
 
     private static final Logger LOGGER = LogManager.getLogger();
 
-    private static final int STARLIGHT_LIGHT_VERSION = 5;
+    private static final int STARLIGHT_LIGHT_VERSION = 6;
 
     private static final String BLOCKLIGHT_STATE_TAG = "starlight.blocklight_state";
     private static final String SKYLIGHT_STATE_TAG = "starlight.skylight_state";

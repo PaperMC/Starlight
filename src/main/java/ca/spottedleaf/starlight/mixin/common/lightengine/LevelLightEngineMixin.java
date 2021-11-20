@@ -8,6 +8,7 @@ import ca.spottedleaf.starlight.common.light.StarLightLightingProvider;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.util.WorldUtil;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
@@ -136,9 +137,7 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
      */
     @Overwrite
     public void queueSectionData(final LightLayer lightType, final SectionPos pos, @Nullable final DataLayer nibble,
-                                 final boolean trustEdges) {
-
-    }
+                                 final boolean trustEdges) {}
 
     /**
      * @reason Avoid messing with the vanilla light engine state
@@ -156,9 +155,7 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
     @Overwrite
     public int getRawBrightness(final BlockPos pos, final int ambientDarkness) {
         // need to use new light hooks for this
-        final int sky = this.lightEngine.getSkyReader().getLightValue(pos) - ambientDarkness;
-        final int block = this.lightEngine.getBlockReader().getLightValue(pos);
-        return Math.max(sky, block);
+        return this.lightEngine.getRawBrightness(pos, ambientDarkness);
     }
 
     @Unique
