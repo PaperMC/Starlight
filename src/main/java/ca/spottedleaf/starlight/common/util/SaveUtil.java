@@ -17,7 +17,7 @@ public final class SaveUtil {
 
     private static final Logger LOGGER = LogManager.getLogger();
 
-    private static final int STARLIGHT_LIGHT_VERSION = 6;
+    private static final int STARLIGHT_LIGHT_VERSION = 7;
 
     private static final String BLOCKLIGHT_STATE_TAG = "starlight.blocklight_state";
     private static final String SKYLIGHT_STATE_TAG = "starlight.skylight_state";
