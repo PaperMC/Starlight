@@ -263,7 +263,8 @@ public abstract class StarLightEngine {
 
             final int chunkX = (index % 5) - this.chunkOffsetX;
             final int chunkZ = ((index / 5) % 5) - this.chunkOffsetZ;
-            final int chunkY = ((index / (5*5)) % (16 + 2 + 2)) - this.chunkOffsetY;
+            final int ySections = this.maxSection - this.minSection + 1;
+            final int chunkY = ((index / (5*5)) % (ySections + 2 + 2)) - this.chunkOffsetY;
             if ((nibble != null && nibble.updateVisible()) || this.notifyUpdateCache[index]) {
                 lightAccess.onLightUpdate(this.skylightPropagator ? LightLayer.SKY : LightLayer.BLOCK, SectionPos.of(chunkX, chunkY, chunkZ));
             }
