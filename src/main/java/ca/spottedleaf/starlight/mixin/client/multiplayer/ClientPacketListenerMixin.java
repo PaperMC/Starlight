@@ -6,6 +6,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.core.SectionPos;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundForgetLevelChunkPacket;
+import net.minecraft.network.protocol.game.ClientboundLevelChunkWithLightPacket;
 import net.minecraft.network.protocol.game.ClientboundLightUpdatePacketData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LightLayer;
@@ -17,9 +18,11 @@ import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ClientPacketListener.class)
+@Mixin(value = ClientPacketListener.class, priority = 1001)
 public abstract class ClientPacketListenerMixin implements ClientGamePacketListener {
 
     /*
@@ -91,8 +94,7 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
     }
 
     /**
-     * Hook for loading in a chunk to the world
-     * @author Spottedleaf
+     * Don't call vanilla's load logic
      */
     @Redirect(
             method = "handleLevelChunkWithLight",
@@ -102,16 +104,32 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
                     ordinal = 0
             )
     )
-    private void postChunkLoadHook(final ClientPacketListener clientPacketListener, final int chunkX, final int chunkZ,
-                                   final ClientboundLightUpdatePacketData clientboundLightUpdatePacketData) {
+    private void postChunkLoadHookRedirect(final ClientPacketListener clientPacketListener, final int chunkX, final int chunkZ,
+                                           final ClientboundLightUpdatePacketData clientboundLightUpdatePacketData) {
+        // don't call vanilla's logic, see below
+    }
+
+    /**
+     * Hook for loading in a chunk to the world
+     * @author Spottedleaf
+     */
+    @Inject(
+            method = "handleLevelChunkWithLight",
+            at = @At(
+                    value = "RETURN"
+            )
+    )
+    private void postChunkLoadHook(final ClientboundLevelChunkWithLightPacket clientboundLevelChunkWithLightPacket, final CallbackInfo ci) {
+        final int chunkX = clientboundLevelChunkWithLightPacket.getX();
+        final int chunkZ = clientboundLevelChunkWithLightPacket.getZ();
         final LevelChunk chunk = (LevelChunk)this.level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
         if (chunk == null) {
             // failed to load
             return;
         }
         // load in light data from packet immediately
-        this.applyLightData(chunkX, chunkZ, clientboundLightUpdatePacketData);
-        ((StarLightLightingProvider)this.level.getChunkSource().getLightEngine()).clientChunkLoad(new ChunkPos(chunkX, chunkZ), chunk);
+        this.applyLightData(chunkX, chunkZ, clientboundLevelChunkWithLightPacket.getLightData());
+        ((StarLightLightingProvider) this.level.getChunkSource().getLightEngine()).clientChunkLoad(new ChunkPos(chunkX, chunkZ), chunk);
 
         // we need this for the update chunk status call, so that it can tell starlight what sections are empty and such
         this.enableChunkLight(chunk, chunkX, chunkZ);
