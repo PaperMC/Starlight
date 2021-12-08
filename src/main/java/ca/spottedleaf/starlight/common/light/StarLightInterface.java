@@ -280,6 +280,10 @@ public final class StarLightInterface {
         final ChunkAccess chunk = this.getAnyChunkNow(pos.getX() >> 4, pos.getZ() >> 4);
 
         final int sky = this.getSkyLightValue(pos, chunk) - ambientDarkness;
+        // Don't fetch the block light level if the skylight level is 15, since the value will never be higher.
+        if (sky == 15) {
+            return 15;
+        }
         final int block = this.getBlockLightValue(pos, chunk);
         return Math.max(sky, block);
     }
