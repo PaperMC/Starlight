@@ -2,9 +2,7 @@ package ca.spottedleaf.starlight.mixin.common.chunk;
 
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LevelHeightAccessor;
-import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.core.Registry;
 import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.ProtoChunk;
@@ -14,14 +12,14 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
 @Mixin(ImposterProtoChunk.class)
-public abstract class ImposterProtoChunkMixin extends ProtoChunk implements ChunkAccess, ExtendedChunk {
+public abstract class ImposterProtoChunkMixin extends ProtoChunk implements ExtendedChunk {
 
     @Final
     @Shadow
     private LevelChunk wrapped;
 
-    public ImposterProtoChunkMixin(final ChunkPos chunkPos, final UpgradeData upgradeData, final LevelHeightAccessor levelHeightAccessor) {
-        super(chunkPos, upgradeData, levelHeightAccessor);
+    public ImposterProtoChunkMixin(final LevelChunk levelChunk, final boolean bl) {
+        super(levelChunk.getPos(), UpgradeData.EMPTY, levelChunk, levelChunk.getLevel().registryAccess().registryOrThrow(Registry.BIOME_REGISTRY), levelChunk.getBlendingData());
     }
 
     @Override

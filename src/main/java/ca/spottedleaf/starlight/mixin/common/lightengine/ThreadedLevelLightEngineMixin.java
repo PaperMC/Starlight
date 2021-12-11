@@ -19,6 +19,7 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -167,7 +168,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
      * @author Spottedleaf
      */
     @Overwrite
-    public void queueSectionData(final LightLayer lightType, final SectionPos pos, final DataLayer nibbles,
+    public void queueSectionData(final LightLayer lightType, final SectionPos pos, final @Nullable DataLayer nibbles,
                                  final boolean bl) {
         // load hooks inside ChunkSerializer
     }

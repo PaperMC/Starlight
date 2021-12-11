@@ -2,7 +2,6 @@ package ca.spottedleaf.starlight.common.light;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
-import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
 import ca.spottedleaf.starlight.common.util.WorldUtil;
 import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import it.unimi.dsi.fastutil.shorts.ShortIterator;
@@ -96,7 +95,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
             if (emptinessMap == null) {
                 // cannot delay nibble init for lit chunks, as we need to init to propagate into them.
                 final LevelChunkSection current = this.getChunkSection(chunkX, currY, chunkZ);
-                if (current == null || current == EMPTY_CHUNK_SECTION) {
+                if (current == null || current.hasOnlyAir()) {
                     continue;
                 }
             } else {
@@ -302,33 +301,21 @@ public final class SkyStarLightEngine extends StarLightEngine {
         }
 
         final int sectionOffset = this.chunkSectionIndexOffset;
-        final int opacity;
+        final BlockState centerState = this.getBlockState(worldX, worldY, worldZ);
+        int opacity = ((ExtendedAbstractBlockState)centerState).getOpacityIfCached();
+
         final BlockState conditionallyOpaqueState;
-        switch ((int)this.getKnownTransparency(worldX, worldY, worldZ)) {
-            case (int)ExtendedChunkSection.BLOCK_IS_TRANSPARENT:
-                opacity = 1;
+        if (opacity < 0) {
+            this.recalcCenterPos.set(worldX, worldY, worldZ);
+            opacity = Math.max(1, centerState.getLightBlock(lightAccess.getLevel(), this.recalcCenterPos));
+            if (((ExtendedAbstractBlockState)centerState).isConditionallyFullOpaque()) {
+                conditionallyOpaqueState = centerState;
+            } else {
                 conditionallyOpaqueState = null;
-                break;
-            case (int)ExtendedChunkSection.BLOCK_IS_FULL_OPAQUE:
-                return 0;
-            case (int)ExtendedChunkSection.BLOCK_UNKNOWN_TRANSPARENCY:
-                opacity = Math.max(1, ((ExtendedAbstractBlockState)this.getBlockState(worldX, worldY, worldZ)).getOpacityIfCached());
-                conditionallyOpaqueState = null;
-                if (opacity >= 15) {
-                    return 0;
-                }
-                break;
-            // variable opacity | conditionally full opaque
-            case (int)ExtendedChunkSection.BLOCK_SPECIAL_TRANSPARENCY:
-            default:
-                this.recalcCenterPos.set(worldX, worldY, worldZ);
-                final BlockState state = this.getBlockState(worldX, worldY, worldZ);
-                opacity = Math.max(1, state.getLightBlock(lightAccess.getLevel(), this.recalcCenterPos));
-                if (((ExtendedAbstractBlockState)state).isConditionallyFullOpaque()) {
-                    conditionallyOpaqueState = state;
-                } else {
-                    conditionallyOpaqueState = null;
-                }
+            }
+        } else {
+            conditionallyOpaqueState = null;
+            opacity = Math.max(1, opacity);
         }
 
         int level = 0;
@@ -347,13 +334,12 @@ public final class SkyStarLightEngine extends StarLightEngine {
                 continue;
             }
 
-            final long neighbourOpacity = this.getKnownTransparency(sectionIndex, (offY & 15) | ((offX & 15) << 4) | ((offZ & 15) << 8));
+            final BlockState neighbourState = this.getBlockState(offX, offY, offZ);
 
-            if (neighbourOpacity == ExtendedChunkSection.BLOCK_SPECIAL_TRANSPARENCY) {
+            if (((ExtendedAbstractBlockState)neighbourState).isConditionallyFullOpaque()) {
                 // here the block can be conditionally opaque (i.e light cannot propagate from it), so we need to test that
                 // we don't read the blockstate because most of the time this is false, so using the faster
                 // known transparency lookup results in a net win
-                final BlockState neighbourState = this.getBlockState(offX, offY, offZ);
                 this.recalcNeighbourPos.set(offX, offY, offZ);
                 final VoxelShape neighbourFace = neighbourState.getFaceOcclusionShape(lightAccess.getLevel(), this.recalcNeighbourPos, direction.opposite.nms);
                 final VoxelShape thisFace = conditionallyOpaqueState == null ? Shapes.empty() : conditionallyOpaqueState.getFaceOcclusionShape(lightAccess.getLevel(), this.recalcCenterPos, direction.nms);
@@ -481,7 +467,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
         int highestNonEmptySection = this.maxSection;
         while (highestNonEmptySection == (this.minSection - 1) ||
-                sections[highestNonEmptySection - this.minSection] == null || sections[highestNonEmptySection - this.minSection].isEmpty()) {
+                sections[highestNonEmptySection - this.minSection] == null || sections[highestNonEmptySection - this.minSection].hasOnlyAir()) {
             this.checkNullSection(chunkX, highestNonEmptySection, chunkZ, false);
             // try propagate FULL to neighbours
 
@@ -551,121 +537,14 @@ public final class SkyStarLightEngine extends StarLightEngine {
 
         if (highestNonEmptySection >= this.minSection) {
             // fill out our other sources
-
-            // init heightmap
-            // index = (x + 1) + ((z + 1) << 5)
-            final int[] heightMap = this.heightMapGen;
-            final int worldChunkX = chunkPos.x << 4;
-            final int worldChunkZ = chunkPos.z << 4;
-            final int minX = worldChunkX - 1;
-            final int maxX = worldChunkX + 16;
-            final int minZ = worldChunkZ - 1;
-            final int maxZ = worldChunkZ + 16;
+            final int minX = chunkPos.x << 4;
+            final int maxX = chunkPos.x << 4 | 15;
+            final int minZ = chunkPos.z << 4;
+            final int maxZ = chunkPos.z << 4 | 15;
+            final int startY = highestNonEmptySection << 4 | 15;
             for (int currZ = minZ; currZ <= maxZ; ++currZ) {
                 for (int currX = minX; currX <= maxX; ++currX) {
-                    int maxY = ((this.minLightSection - 1) << 4);
-
-                    // ensure the section below is always checked
-                    this.checkNullSection(currX >> 4, highestNonEmptySection, currZ >> 4, false);
-                    this.checkNullSection(currX >> 4, highestNonEmptySection - 1, currZ >> 4, false);
-                    for (int sectionY = highestNonEmptySection; sectionY >= 0; --sectionY) {
-                        final LevelChunkSection section = this.getChunkSection(currX >> 4, sectionY, currZ >> 4);
-
-                        if (section == null) {
-                            // unloaded neighbour
-                            continue;
-                        }
-
-                        // ensure the section below is always checked
-                        this.checkNullSection(currX >> 4, sectionY - 1, currZ >> 4, false);
-
-                        final long bitset = ((ExtendedChunkSection)section).getBitsetForColumn(currX & 15, currZ & 15);
-                        if (bitset == 0) {
-                            continue;
-                        }
-
-                        final int highestBitSet = 63 ^ Long.numberOfLeadingZeros(bitset); // from [0, 63]
-                        final int highestYValue = highestBitSet >>> 1; // y = highest bit set / bits per block
-                        maxY = highestYValue | (sectionY << 4);
-                        break;
-                    }
-                    heightMap[(currX - worldChunkX + 1) | ((currZ - worldChunkZ + 1) << 5)] = maxY;
-                }
-            }
-
-            // now setup sources
-            final int encodeOffset = this.coordinateOffset;
-            for (int currZ = 0; currZ <= 15; ++currZ) {
-                for (int currX = 0; currX <= 15; ++currX) {
-                    final int worldX = currX | worldChunkX;
-                    final int worldZ = currZ | worldChunkZ;
-                    // NX = -1 on x
-                    // PX = +1 on x
-                    // NZ = -1 on z
-                    // PZ = +1 on z
-                    // C = center
-
-                    // index = (x + 1) | ((z + 1) << 5)
-
-                    // X = 0, Z = 0
-                    final int heightMapC  = heightMap[(currX + 1) | ((currZ + 1) << 5)];
-
-                    // X = -1
-                    final int heightMapNX = heightMap[(currX - 1 + 1) | ((currZ + 1) << 5)];
-
-                    // X = 1
-                    final int heightMapPX = heightMap[(currX + 1 + 1) | ((currZ + 1) << 5)];
-
-                    // Z = -1
-                    final int heightMapNZ = heightMap[(currX + 1) | ((currZ - 1 + 1) << 5)];
-
-                    // Z = 1
-                    final int heightMapPZ = heightMap[(currX + 1) | ((currZ + 1 + 1) << 5)];
-
-                    for (int currY = (highestNonEmptySection << 4) + 16; currY > heightMapC;) {
-                        final SWMRNibbleArray nibble = this.getNibbleFromCache(chunkX, currY >> 4, chunkZ);
-                        if (nibble == null) {
-                            // skip this section, has no data
-                            currY = (currY - 16) & (~15);
-                            continue;
-                        }
-
-                        long propagateDirectionBitset = 0L;
-                        // +X
-                        propagateDirectionBitset |= ((currY <= heightMapPX) ? 1L : 0L) << AxisDirection.POSITIVE_X.ordinal();
-
-                        // -X
-                        propagateDirectionBitset |= ((currY <= heightMapNX) ? 1L : 0L) << AxisDirection.NEGATIVE_X.ordinal();
-
-                        // +Z
-                        propagateDirectionBitset |= ((currY <= heightMapPZ) ? 1L : 0L) << AxisDirection.POSITIVE_Z.ordinal();
-
-                        // -Z
-                        propagateDirectionBitset |= ((currY <= heightMapNZ) ? 1L : 0L) << AxisDirection.NEGATIVE_Z.ordinal();
-
-                        // +Y is always 0 since we don't want to check upwards
-
-                        // -Y:
-                        propagateDirectionBitset |= ((currY == (heightMapC + 1)) ? 1L : 0L) << AxisDirection.NEGATIVE_Y.ordinal();
-
-                        // now setup source
-                        // unlike block checks, we don't use FORCE_WRITE here because our init doesn't rely on above nibbles
-                        // when initialising
-                        nibble.set((worldX & 15) | ((worldZ & 15) << 4) | ((currY & 15) << 8), 15);
-                        if (propagateDirectionBitset != 0L) {
-                            this.appendToIncreaseQueue(
-                                    ((worldX + (worldZ << 6) + (currY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
-                                            | (15L << (6 + 6 + 16))
-                                            | propagateDirectionBitset << (6 + 6 + 16 + 4)
-                                            // above heightmap, so not sidedly transparent
-                            );
-                        }
-
-                        --currY;
-                    }
-
-                    // Just in case there's a conditionally transparent block at the top.
-                    this.tryPropagateSkylight(world, worldX, heightMapC, worldZ, false, false);
+                    this.tryPropagateSkylight(world, currX, startY + 1, currZ, false, false);
                 }
             }
         } // else: apparently the chunk is empty
@@ -743,19 +622,13 @@ public final class SkyStarLightEngine extends StarLightEngine {
         this.checkNullSection(worldX >> 4, startY >> 4, worldZ >> 4, extrudeInitialised);
 
         BlockState above = this.getBlockState(worldX, startY + 1, worldZ);
-        if (above == null) {
-            above = AIR_BLOCK_STATE;
-        }
 
         for (;startY >= (this.minLightSection << 4); --startY) {
             if ((startY & 15) == 15) {
                 // ensure this section is always checked
                 this.checkNullSection(worldX >> 4, startY >> 4, worldZ >> 4, extrudeInitialised);
             }
-            BlockState current = this.getBlockState(worldX, startY, worldZ);
-            if (current == null) {
-                current = AIR_BLOCK_STATE;
-            }
+            final BlockState current = this.getBlockState(worldX, startY, worldZ);
 
             final VoxelShape fromShape;
             if (((ExtendedAbstractBlockState)above).isConditionallyFullOpaque()) {

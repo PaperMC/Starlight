@@ -3,7 +3,6 @@ package ca.spottedleaf.starlight.common.util;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
-import ca.spottedleaf.starlight.common.util.WorldUtil;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
@@ -18,7 +17,7 @@ public final class SaveUtil {
 
     private static final Logger LOGGER = LogManager.getLogger();
 
-    private static final int STARLIGHT_LIGHT_VERSION = 5;
+    private static final int STARLIGHT_LIGHT_VERSION = 7;
 
     private static final String BLOCKLIGHT_STATE_TAG = "starlight.blocklight_state";
     private static final String SKYLIGHT_STATE_TAG = "starlight.skylight_state";
@@ -34,8 +33,8 @@ public final class SaveUtil {
         }
     }
 
-    private static void saveLightHookReal(final Level world, final ChunkAccess chunk, final CompoundTag nbt) {
-        if (nbt == null) {
+    private static void saveLightHookReal(final Level world, final ChunkAccess chunk, final CompoundTag tag) {
+        if (tag == null) {
             return;
         }
 
@@ -45,18 +44,17 @@ public final class SaveUtil {
         SWMRNibbleArray[] blockNibbles = ((ExtendedChunk) chunk).getBlockNibbles();
         SWMRNibbleArray[] skyNibbles = ((ExtendedChunk) chunk).getSkyNibbles();
 
-        CompoundTag level = nbt.getCompound("Level");
         boolean lit = chunk.isLightCorrect() || !(world instanceof ServerLevel);
         // diff start - store our tag for whether light data is init'd
         if (lit) {
-            level.putBoolean("isLightOn", false);
+            tag.putBoolean("isLightOn", false);
         }
         // diff end - store our tag for whether light data is init'd
-        ChunkStatus status = ChunkStatus.byName(level.getString("Status"));
+        ChunkStatus status = ChunkStatus.byName(tag.getString("Status"));
 
         CompoundTag[] sections = new CompoundTag[maxSection - minSection + 1];
 
-        ListTag sectionsStored = level.getList("Sections", 10);
+        ListTag sectionsStored = tag.getList("sections", 10);
 
         for (int i = 0; i < sectionsStored.size(); ++i) {
             CompoundTag sectionStored = sectionsStored.getCompound(i);
@@ -113,9 +111,9 @@ public final class SaveUtil {
                 sectionsStored.add(section);
             }
         }
-        level.put("Sections", sectionsStored);
+        tag.put("sections", sectionsStored);
         if (lit) {
-            level.putInt(STARLIGHT_VERSION_TAG, STARLIGHT_LIGHT_VERSION); // only mark as fully lit after we have successfully injected our data
+            tag.putInt(STARLIGHT_VERSION_TAG, STARLIGHT_LIGHT_VERSION); // only mark as fully lit after we have successfully injected our data
         }
     }
 
@@ -143,12 +141,11 @@ public final class SaveUtil {
 
 
         // start copy from from the original method
-        CompoundTag levelTag = tag.getCompound("Level");
-        boolean lit = levelTag.get("isLightOn") != null && levelTag.getInt(STARLIGHT_VERSION_TAG) == STARLIGHT_LIGHT_VERSION;
+        boolean lit = tag.get("isLightOn") != null && tag.getInt(STARLIGHT_VERSION_TAG) == STARLIGHT_LIGHT_VERSION;
         boolean canReadSky = world.dimensionType().hasSkyLight();
-        ChunkStatus status = ChunkStatus.byName(tag.getCompound("Level").getString("Status"));
+        ChunkStatus status = ChunkStatus.byName(tag.getString("Status"));
         if (lit && status.isOrAfter(ChunkStatus.LIGHT)) { // diff - we add the status check here
-            ListTag sections = levelTag.getList("Sections", 10);
+            ListTag sections = tag.getList("sections", 10);
 
             for (int i = 0; i < sections.size(); ++i) {
                 CompoundTag sectionData = sections.getCompound(i);

@@ -8,7 +8,6 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.storage.ChunkSerializer;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -37,8 +36,8 @@ public abstract class ChunkSerializerMixin {
             method = "read",
             at = @At("RETURN")
     )
-    private static void loadLightHook(final ServerLevel world, final StructureManager structureManager, final PoiManager poiManager,
-                                      final ChunkPos pos, final CompoundTag tag, final CallbackInfoReturnable<ProtoChunk> cir) {
-        SaveUtil.loadLightHook(world, pos, tag, cir.getReturnValue());
+    private static void loadLightHook(final ServerLevel serverLevel, final PoiManager poiManager, final ChunkPos chunkPos,
+                                      final CompoundTag compoundTag, final CallbackInfoReturnable<ProtoChunk> cir) {
+        SaveUtil.loadLightHook(serverLevel, chunkPos, compoundTag, cir.getReturnValue());
     }
 }

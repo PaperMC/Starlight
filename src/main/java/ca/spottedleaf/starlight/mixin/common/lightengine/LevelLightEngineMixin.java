@@ -20,6 +20,7 @@ import net.minecraft.world.level.lighting.LayerLightEngine;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.lighting.LightEventListener;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
@@ -32,9 +33,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class LevelLightEngineMixin implements LightEventListener, StarLightLightingProvider {
 
     @Shadow
+    @Nullable
     private LayerLightEngine<?, ?> blockEngine;
 
     @Shadow
+    @Nullable
     private LayerLightEngine<?, ?> skyEngine;
 
     @Unique
@@ -132,10 +135,8 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
      * @author Spottedleaf
      */
     @Overwrite
-    public void queueSectionData(final LightLayer lightType, final SectionPos pos, final DataLayer nibble,
-                                 final boolean trustEdges) {
-
-    }
+    public void queueSectionData(final LightLayer lightType, final SectionPos pos, @Nullable final DataLayer nibble,
+                                 final boolean trustEdges) {}
 
     /**
      * @reason Avoid messing with the vanilla light engine state
@@ -153,9 +154,7 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
     @Overwrite
     public int getRawBrightness(final BlockPos pos, final int ambientDarkness) {
         // need to use new light hooks for this
-        final int sky = this.lightEngine.getSkyReader().getLightValue(pos) - ambientDarkness;
-        final int block = this.lightEngine.getBlockReader().getLightValue(pos);
-        return Math.max(sky, block);
+        return this.lightEngine.getRawBrightness(pos, ambientDarkness);
     }
 
     @Unique

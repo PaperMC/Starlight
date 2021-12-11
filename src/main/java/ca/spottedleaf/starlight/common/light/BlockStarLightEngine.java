@@ -2,8 +2,6 @@ package ca.spottedleaf.starlight.common.light;
 
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
-import ca.spottedleaf.starlight.common.chunk.ExtendedChunkSection;
-import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -17,7 +15,6 @@ import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -171,13 +168,11 @@ public final class BlockStarLightEngine extends StarLightEngine {
                 continue;
             }
 
-            final long neighbourOpacity = this.getKnownTransparency(sectionIndex, (offY & 15) | ((offX & 15) << 4) | ((offZ & 15) << 8));
-
-            if (neighbourOpacity == ExtendedChunkSection.BLOCK_SPECIAL_TRANSPARENCY) {
+            final BlockState neighbourState = this.getBlockState(offX, offY, offZ);
+            if (((ExtendedAbstractBlockState)neighbourState).isConditionallyFullOpaque()) {
                 // here the block can be conditionally opaque (i.e light cannot propagate from it), so we need to test that
                 // we don't read the blockstate because most of the time this is false, so using the faster
                 // known transparency lookup results in a net win
-                final BlockState neighbourState = this.getBlockState(offX, offY, offZ);
                 this.recalcNeighbourPos.set(offX, offY, offZ);
                 final VoxelShape neighbourFace = neighbourState.getFaceOcclusionShape(lightAccess.getLevel(), this.recalcNeighbourPos, direction.opposite.nms);
                 final VoxelShape thisFace = conditionallyOpaqueState == null ? Shapes.empty() : conditionallyOpaqueState.getFaceOcclusionShape(lightAccess.getLevel(), this.recalcCenterPos, direction.nms);
@@ -220,7 +215,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
             final LevelChunkSection[] sections = chunk.getSections();
             for (int sectionY = this.minSection; sectionY <= this.maxSection; ++sectionY) {
                 final LevelChunkSection section = sections[sectionY - this.minSection];
-                if (section == null || section.isEmpty()) {
+                if (section == null || section.hasOnlyAir()) {
                     // no sources in empty sections
                     continue;
                 }

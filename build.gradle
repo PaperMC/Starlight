@@ -30,7 +30,7 @@ group = "ca.spottedleaf.${modid}"
 version = "${mod_version}" + "+forge." + getGitCommit()
 archivesBaseName = "${modid}"
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(16)
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 minecraft {
     mappings channel: "${mappings_channel}", version: "${mappings_version}"

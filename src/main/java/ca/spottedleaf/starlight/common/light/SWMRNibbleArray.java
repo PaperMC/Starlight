@@ -54,7 +54,7 @@ public final class SWMRNibbleArray {
 
     protected byte[] storageUpdating;
     protected boolean updatingDirty; // only returns whether storageUpdating is dirty
-    protected byte[] storageVisible;
+    protected volatile byte[] storageVisible;
 
     public SWMRNibbleArray() {
         this(null, false); // lazy init
@@ -395,18 +395,16 @@ public final class SWMRNibbleArray {
 
     // operation type: visible
     public int getVisible(final int index) {
-        synchronized (this) {
-            // indices range from 0 -> 4096
-            final byte[] visibleBytes = this.storageVisible;
-            if (visibleBytes == null) {
-                return 0;
-            }
-            final byte value = visibleBytes[index >>> 1];
-
-            // if we are an even index, we want lower 4 bits
-            // if we are an odd index, we want upper 4 bits
-            return ((value >>> ((index & 1) << 2)) & 0xF);
+        // indices range from 0 -> 4096
+        final byte[] visibleBytes = this.storageVisible;
+        if (visibleBytes == null) {
+            return 0;
         }
+        final byte value = visibleBytes[index >>> 1];
+
+        // if we are an even index, we want lower 4 bits
+        // if we are an odd index, we want upper 4 bits
+        return ((value >>> ((index & 1) << 2)) & 0xF);
     }
 
     // operation type: updating
