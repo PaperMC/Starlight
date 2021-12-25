@@ -11,6 +11,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.DataLayer;
@@ -57,7 +58,12 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
     )
     public void construct(final LightChunkGetter chunkProvider, final boolean hasBlockLight, final boolean hasSkyLight,
                           final CallbackInfo ci) {
-        this.lightEngine = new StarLightInterface(chunkProvider, hasSkyLight, hasBlockLight, (LevelLightEngine)(Object)this);
+        // avoid ClassCastException in cases where custom LightChunkGetters do not return a Level from getLevel()
+        if (chunkProvider.getLevel() instanceof Level) {
+            this.lightEngine = new StarLightInterface(chunkProvider, hasSkyLight, hasBlockLight, (LevelLightEngine) (Object) this);
+        } else {
+            this.lightEngine = new StarLightInterface(null, hasSkyLight, hasBlockLight, (LevelLightEngine) (Object) this);
+        }
         // intentionally destroy mods hooking into old light engine state
         this.blockEngine = null;
         this.skyEngine = null;
