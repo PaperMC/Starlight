@@ -95,7 +95,8 @@ public final class BlockStarLightEngine extends StarLightEngine {
 
         final int currentLevel = this.getLightLevel(worldX, worldY, worldZ);
         final BlockState blockState = this.getBlockState(worldX, worldY, worldZ);
-        final int emittedLevel = blockState.getLightEmission() & emittedMask;
+        this.checkBlockPos.set(worldX, worldY, worldZ);
+        final int emittedLevel = blockState.getLightEmission(lightAccess.getLevel(), this.checkBlockPos) & emittedMask; // Forge
 
         this.setLightLevel(worldX, worldY, worldZ, emittedLevel);
         // this accounts for change in emitted light that would cause an increase
@@ -129,7 +130,8 @@ public final class BlockStarLightEngine extends StarLightEngine {
     protected int calculateLightValue(final LightChunkGetter lightAccess, final int worldX, final int worldY, final int worldZ,
                                       final int expect) {
         final BlockState centerState = this.getBlockState(worldX, worldY, worldZ);
-        int level = centerState.getLightEmission() & 0xF;
+        this.recalcCenterPos.set(worldX, worldY, worldZ); // Forge
+        int level = centerState.getLightEmission(lightAccess.getLevel(), this.recalcCenterPos) & 0xF;
 
         if (level >= (15 - 1) || level > expect) {
             return level;
@@ -140,7 +142,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
         int opacity = ((ExtendedAbstractBlockState)centerState).getOpacityIfCached();
 
         if (opacity == -1) {
-            this.recalcCenterPos.set(worldX, worldY, worldZ);
+            // Forge
             opacity = centerState.getLightBlock(lightAccess.getLevel(), this.recalcCenterPos);
             if (((ExtendedAbstractBlockState)centerState).isConditionallyFullOpaque()) {
                 conditionallyOpaqueState = centerState;
@@ -224,8 +226,16 @@ public final class BlockStarLightEngine extends StarLightEngine {
 
                 for (int index = 0; index < (16 * 16 * 16); ++index) {
                     final BlockState state = states.get(index);
-                    if (state.getLightEmission() <= 0) {
-                        continue;
+                    if (((ExtendedAbstractBlockState)state).getOpacityIfCached() == -1) {
+                        // Forge
+                        this.mutablePos1.set(offX | (index & 15), offY | (index >>> 8), offZ | ((index >>> 4) & 15));
+                        if (state.getLightEmission(lightAccess.getLevel(), this.mutablePos1) <= 0) {
+                            continue;
+                        }
+                    } else {
+                        if (state.getLightEmission() <= 0) {
+                            continue;
+                        }
                     }
 
                     // index = x | (z << 4) | (y << 8)
@@ -256,7 +266,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
         for (final Iterator<BlockPos> positions = this.getSources(lightAccess, chunk); positions.hasNext();) {
             final BlockPos pos = positions.next();
             final BlockState blockState = this.getBlockState(pos.getX(), pos.getY(), pos.getZ());
-            final int emittedLight = blockState.getLightEmission() & emittedMask;
+            final int emittedLight = blockState.getLightEmission(lightAccess.getLevel(), pos) & emittedMask; // Forge
 
             if (emittedLight <= this.getLightLevel(pos.getX(), pos.getY(), pos.getZ())) {
                 // some other source is brighter

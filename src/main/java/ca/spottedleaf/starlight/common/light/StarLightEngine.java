@@ -437,6 +437,8 @@ public abstract class StarLightEngine {
     // subclasses should not invoke updateVisible, as this will always be done by the super call
     protected abstract void propagateBlockChanges(final LightChunkGetter lightAccess, final ChunkAccess atChunk, final Set<BlockPos> positions);
 
+    protected final BlockPos.MutableBlockPos checkBlockPos = new BlockPos.MutableBlockPos(); // Forge
+
     protected abstract void checkBlock(final LightChunkGetter lightAccess, final int worldX, final int worldY, final int worldZ);
 
     // if ret > expect, then the real value is at least ret (early returns if ret > expect, rather than calculating actual)
@@ -1404,7 +1406,7 @@ public abstract class StarLightEngine {
                                             | (FLAG_RECHECK_LEVEL | flags);
                             continue;
                         }
-                        final int emittedLight = blockState.getLightEmission() & emittedMask;
+                        final int emittedLight = blockState.getLightEmission(world, this.mutablePos1) & emittedMask; // Forge
                         if (emittedLight != 0) {
                             // re-propagate source
                             // note: do not set recheck level, or else the propagation will fail
@@ -1533,7 +1535,7 @@ public abstract class StarLightEngine {
                                             | (FLAG_RECHECK_LEVEL | flags);
                             continue;
                         }
-                        final int emittedLight = blockState.getLightEmission() & emittedMask;
+                        final int emittedLight = blockState.getLightEmission(world, this.mutablePos1) & emittedMask; // Forge
                         if (emittedLight != 0) {
                             // re-propagate source
                             // note: do not set recheck level, or else the propagation will fail
