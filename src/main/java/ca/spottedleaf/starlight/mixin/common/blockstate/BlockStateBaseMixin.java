@@ -57,10 +57,7 @@ public abstract class BlockStateBaseMixin extends StateHolder<Block, BlockState>
         this.opacityIfCached = this.cache == null || this.isConditionallyFullOpaque ? -1 : this.cache.lightBlock;
         // Forge
         try {
-            if (!this.getClass().getMethod("getLightEmission", BlockGetter.class, BlockPos.class)
-                    .equals(BlockState.class.getMethod("getLightEmission", BlockGetter.class, BlockPos.class)) ||
-                !this.getBlock().getClass().getMethod("getLightEmission", BlockState.class, BlockGetter.class, BlockPos.class)
-                        .equals(Block.class.getMethod("getLightEmission", BlockState.class, BlockGetter.class, BlockPos.class))) {
+            if (true) {
                 this.opacityIfCached = -1;
             }
         } catch (final Exception ex) {
