@@ -60,9 +60,9 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
                           final CallbackInfo ci) {
         // avoid ClassCastException in cases where custom LightChunkGetters do not return a Level from getLevel()
         if (chunkProvider.getLevel() instanceof Level) {
-            this.lightEngine = new StarLightInterface(chunkProvider, hasSkyLight, hasBlockLight, (LevelLightEngine) (Object) this);
+            this.lightEngine = new StarLightInterface(chunkProvider, hasSkyLight, hasBlockLight, (LevelLightEngine)(Object)this);
         } else {
-            this.lightEngine = new StarLightInterface(null, hasSkyLight, hasBlockLight, (LevelLightEngine) (Object) this);
+            this.lightEngine = new StarLightInterface(null, hasSkyLight, hasBlockLight, (LevelLightEngine)(Object)this);
         }
         // intentionally destroy mods hooking into old light engine state
         this.blockEngine = null;
@@ -231,5 +231,4 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
             ((ExtendedChunk)chunk).setSkyNibbles(skyNibbles);
         }
     }
-
 }

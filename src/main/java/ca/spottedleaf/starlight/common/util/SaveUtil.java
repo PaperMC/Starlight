@@ -3,6 +3,7 @@ package ca.spottedleaf.starlight.common.util;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.light.StarLightEngine;
+import com.mojang.logging.LogUtils;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.server.level.ServerLevel;
@@ -10,12 +11,11 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkStatus;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
 
 public final class SaveUtil {
 
-    private static final Logger LOGGER = LogManager.getLogger();
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private static final int STARLIGHT_LIGHT_VERSION = 7;
 

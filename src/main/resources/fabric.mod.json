@@ -25,7 +25,7 @@
   ],
   "accessWidener" : "starlight.accesswidener",
   "depends": {
-    "fabricloader": ">=0.10.8",
-    "minecraft": ">=1.18.0"
+    "fabricloader": ">=0.13.3",
+    "minecraft": ">=1.18.2"
   }
 }
