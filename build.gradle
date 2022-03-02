@@ -113,7 +113,7 @@ jar {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
-    annotationProcessor "org.spongepowered:mixin:0.8.4:processor"
+    annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
 }
 
 mixin {

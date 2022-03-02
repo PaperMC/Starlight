@@ -3,6 +3,7 @@ package ca.spottedleaf.starlight.mixin.common.world;
 import ca.spottedleaf.starlight.common.util.CoordinateUtils;
 import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import com.mojang.datafixers.util.Either;
+import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ChunkHolder;
 import net.minecraft.server.level.ChunkMap;
@@ -29,7 +30,7 @@ public abstract class ServerWorldMixin extends Level implements WorldGenLevel, E
     private ServerChunkCache chunkSource;
 
     protected ServerWorldMixin(final WritableLevelData writableLevelData, final ResourceKey<Level> resourceKey,
-                               final DimensionType dimensionType, final Supplier<ProfilerFiller> supplier, final boolean bl,
+                               final Holder<DimensionType> dimensionType, final Supplier<ProfilerFiller> supplier, final boolean bl,
                                final boolean bl2, final long l) {
         super(writableLevelData, resourceKey, dimensionType, supplier, bl, bl2, l);
     }

@@ -18,8 +18,8 @@ import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.lighting.LevelLightEngine;
-import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
+import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -115,7 +115,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
             }
         }, world.getChunkSource().chunkMap.mainThreadExecutor).whenComplete((final Void ignore, final Throwable thr) -> {
             if (thr != null) {
-                LOGGER.fatal("Failed to remove ticket level for post chunk task " + new ChunkPos(chunkX, chunkZ), thr);
+                LOGGER.error("Failed to remove ticket level for post chunk task " + new ChunkPos(chunkX, chunkZ), thr);
             }
         });
     }
@@ -211,7 +211,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
             this.tryScheduleUpdate();
         }).whenComplete((final ChunkAccess c, final Throwable throwable) -> {
             if (throwable != null) {
-                LOGGER.fatal("Failed to light chunk " + chunkPos, throwable);
+                LOGGER.error("Failed to light chunk " + chunkPos, throwable);
             }
         });
     }
