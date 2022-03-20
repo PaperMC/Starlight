@@ -22,8 +22,8 @@ public abstract class ClientLevelMixin extends Level implements ExtendedWorld {
     public abstract ClientChunkCache getChunkSource();
 
     protected ClientLevelMixin(final WritableLevelData writableLevelData, final ResourceKey<Level> resourceKey, final Holder<DimensionType> dimensionType,
-                               final Supplier<ProfilerFiller> supplier, final boolean bl, final boolean bl2, final long l) {
-        super(writableLevelData, resourceKey, dimensionType, supplier, bl, bl2, l);
+                               final Supplier<ProfilerFiller> supplier, final boolean bl, final boolean bl2, final long l, final int maxUpdates) {
+        super(writableLevelData, resourceKey, dimensionType, supplier, bl, bl2, l, maxUpdates);
     }
 
     @Override

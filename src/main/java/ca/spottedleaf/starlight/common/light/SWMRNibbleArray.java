@@ -177,13 +177,17 @@ public final class SWMRNibbleArray {
         final byte[] src = other.storageUpdating;
         final byte[] into;
 
-        if (this.storageUpdating != null) {
-            into = this.storageUpdating;
+        if (!this.updatingDirty) {
+            if (this.storageUpdating != null) {
+                into = this.storageUpdating = allocateBytes();
+            } else {
+                this.storageUpdating = into = allocateBytes();
+                this.stateUpdating = INIT_STATE_INIT;
+            }
+            this.updatingDirty = true;
         } else {
-            this.storageUpdating = into = allocateBytes();
-            this.stateUpdating = INIT_STATE_INIT;
+            into = this.storageUpdating;
         }
-        this.updatingDirty = true;
 
         final int start = 0;
         final int end = (15 | (15 << 4)) >>> 1;

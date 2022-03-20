@@ -16,13 +16,13 @@ license = "LGPL-3.0-only"
  [[dependencies.starlight]]
   modId = "forge"
   mandatory = true
-  versionRange = "[40.0.0,)"
+  versionRange = "[41.0.35,)"
   ordering = "NONE"
   side = "BOTH"
 
 [[dependencies.starlight]]
   modId = "minecraft"
   mandatory = true
-  versionRange = "[1.18.2, 1.19)"
+  versionRange = "[1.19, 1.20)"
   ordering = "NONE"
   side = "BOTH"
