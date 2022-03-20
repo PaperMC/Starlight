@@ -17,7 +17,11 @@ public final class SaveUtil {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    private static final int STARLIGHT_LIGHT_VERSION = 7;
+    private static final int STARLIGHT_LIGHT_VERSION = 8;
+
+    public static int getLightVersion() {
+        return STARLIGHT_LIGHT_VERSION;
+    }
 
     private static final String BLOCKLIGHT_STATE_TAG = "starlight.blocklight_state";
     private static final String SKYLIGHT_STATE_TAG = "starlight.skylight_state";
@@ -140,7 +144,7 @@ public final class SaveUtil {
         SWMRNibbleArray[] skyNibbles = StarLightEngine.getFilledEmptyLight(world);
 
 
-        // start copy from from the original method
+        // start copy from the original method
         boolean lit = tag.get("isLightOn") != null && tag.getInt(STARLIGHT_VERSION_TAG) == STARLIGHT_LIGHT_VERSION;
         boolean canReadSky = world.dimensionType().hasSkyLight();
         ChunkStatus status = ChunkStatus.byName(tag.getString("Status"));
