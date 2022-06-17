@@ -30,9 +30,12 @@ public final class SaveUtil {
     public static void saveLightHook(final Level world, final ChunkAccess chunk, final CompoundTag nbt) {
         try {
             saveLightHookReal(world, chunk, nbt);
-        } catch (final Exception ex) {
+        } catch (final Throwable ex) {
             // failing to inject is not fatal so we catch anything here. if it fails, it will have correctly set lit to false
             // for Vanilla to relight on load and it will not set our lit tag so we will relight on load
+            if (ex instanceof ThreadDeath) {
+                throw (ThreadDeath)ex;
+            }
             LOGGER.warn("Failed to inject light data into save data for chunk " + chunk.getPos() + ", chunk light will be recalculated on its next load", ex);
         }
     }
@@ -45,8 +48,8 @@ public final class SaveUtil {
         final int minSection = WorldUtil.getMinLightSection(world);
         final int maxSection = WorldUtil.getMaxLightSection(world);
 
-        SWMRNibbleArray[] blockNibbles = ((ExtendedChunk) chunk).getBlockNibbles();
-        SWMRNibbleArray[] skyNibbles = ((ExtendedChunk) chunk).getSkyNibbles();
+        SWMRNibbleArray[] blockNibbles = ((ExtendedChunk)chunk).getBlockNibbles();
+        SWMRNibbleArray[] skyNibbles = ((ExtendedChunk)chunk).getSkyNibbles();
 
         boolean lit = chunk.isLightCorrect() || !(world instanceof ServerLevel);
         // diff start - store our tag for whether light data is init'd
@@ -124,9 +127,12 @@ public final class SaveUtil {
     public static void loadLightHook(final Level world, final ChunkPos pos, final CompoundTag tag, final ChunkAccess into) {
         try {
             loadLightHookReal(world, pos, tag, into);
-        } catch (final Exception ex) {
+        } catch (final Throwable ex) {
             // failing to inject is not fatal so we catch anything here. if it fails, then we simply relight. Not a problem, we get correct
             // lighting in both cases.
+            if (ex instanceof ThreadDeath) {
+                throw (ThreadDeath)ex;
+            }
             LOGGER.warn("Failed to load light for chunk " + pos + ", light will be recalculated", ex);
         }
     }
@@ -184,5 +190,4 @@ public final class SaveUtil {
     }
 
     private SaveUtil() {}
-
 }
