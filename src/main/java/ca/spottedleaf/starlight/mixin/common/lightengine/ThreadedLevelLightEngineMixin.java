@@ -69,9 +69,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
 
         if (!world.getChunkSource().chunkMap.mainThreadExecutor.isSameThread()) {
             // ticket logic is not safe to run off-main, re-schedule
-            world.getChunkSource().chunkMap.mainThreadExecutor.execute(() -> {
-                this.queueTaskForSection(chunkX, chunkY, chunkZ, runnable);
-            });
+            world.getChunkSource().chunkMap.mainThreadExecutor.execute(() -> this.queueTaskForSection(chunkX, chunkY, chunkZ, runnable));
             return;
         }
 
@@ -97,9 +95,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
             for (int dz = -1; dz <= 1; ++dz) {
                 ChunkHolder neighbour = world.getChunkSource().chunkMap.getUpdatingChunkIfPresent(CoordinateUtils.getChunkKey(dx + chunkX, dz + chunkZ));
                 if (neighbour != null) {
-                    neighbour.chunkToSave = neighbour.chunkToSave.thenCombine(updateFuture, (final ChunkAccess curr, final Void ignore) -> {
-                        return curr;
-                    });
+                    neighbour.chunkToSave = neighbour.chunkToSave.thenCombine(updateFuture, (final ChunkAccess curr, final Void ignore) -> curr);
                 }
             }
         }
@@ -128,9 +124,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
     @Overwrite
     public void checkBlock(final BlockPos pos) {
         final BlockPos posCopy = pos.immutable();
-        this.queueTaskForSection(posCopy.getX() >> 4, posCopy.getY() >> 4, posCopy.getZ() >> 4, () -> {
-            return this.getLightEngine().blockChange(posCopy);
-        });
+        this.queueTaskForSection(posCopy.getX() >> 4, posCopy.getY() >> 4, posCopy.getZ() >> 4, () -> this.getLightEngine().blockChange(posCopy));
     }
 
     /**
@@ -148,9 +142,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
      */
     @Overwrite
     public void updateSectionStatus(final SectionPos pos, final boolean notReady) {
-        this.queueTaskForSection(pos.getX(), pos.getY(), pos.getZ(), () -> {
-            return this.getLightEngine().sectionChange(pos, notReady);
-        });
+        this.queueTaskForSection(pos.getX(), pos.getY(), pos.getZ(), () -> this.getLightEngine().sectionChange(pos, notReady));
     }
 
     /**

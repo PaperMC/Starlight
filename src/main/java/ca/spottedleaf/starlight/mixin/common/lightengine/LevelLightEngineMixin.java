@@ -178,28 +178,24 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
         // data storage changed with new light impl
         final ChunkAccess chunk = this.getLightEngine().getAnyChunkNow(pos.getX(), pos.getZ());
         switch (lightType) {
-            case BLOCK: {
-                final SWMRNibbleArray[] blockNibbles = this.blockLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
-                    return StarLightEngine.getFilledEmptyLight(this.lightEngine.getWorld());
-                });
+            case BLOCK -> {
+                final SWMRNibbleArray[] blockNibbles = this.blockLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> StarLightEngine.getFilledEmptyLight(this.lightEngine.getWorld()));
 
                 blockNibbles[pos.getY() - WorldUtil.getMinLightSection(this.lightEngine.getWorld())] = SWMRNibbleArray.fromVanilla(nibble);
 
                 if (chunk != null) {
-                    ((ExtendedChunk)chunk).setBlockNibbles(blockNibbles);
+                    ((ExtendedChunk) chunk).setBlockNibbles(blockNibbles);
                     this.lightEngine.getLightAccess().onLightUpdate(LightLayer.BLOCK, pos);
                 }
                 break;
             }
-            case SKY: {
-                final SWMRNibbleArray[] skyNibbles = this.skyLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
-                    return StarLightEngine.getFilledEmptyLight(this.lightEngine.getWorld());
-                });
+            case SKY -> {
+                final SWMRNibbleArray[] skyNibbles = this.skyLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> StarLightEngine.getFilledEmptyLight(this.lightEngine.getWorld()));
 
                 skyNibbles[pos.getY() - WorldUtil.getMinLightSection(this.lightEngine.getWorld())] = SWMRNibbleArray.fromVanilla(nibble);
 
                 if (chunk != null) {
-                    ((ExtendedChunk)chunk).setSkyNibbles(skyNibbles);
+                    ((ExtendedChunk) chunk).setSkyNibbles(skyNibbles);
                     this.lightEngine.getLightAccess().onLightUpdate(LightLayer.SKY, pos);
                 }
                 break;

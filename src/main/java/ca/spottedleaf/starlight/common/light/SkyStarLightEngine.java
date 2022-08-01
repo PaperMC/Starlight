@@ -175,7 +175,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
         if (needInitNeighbours) {
             for (int dz = -1; dz <= 1; ++dz) {
                 for (int dx = -1; dx <= 1; ++dx) {
-                    this.initNibble(dx + chunkX, chunkY, dz + chunkZ, (dx | dz) == 0 ? extrudeInitialised : true, true);
+                    this.initNibble(dx + chunkX, chunkY, dz + chunkZ, (dx | dz) != 0 || extrudeInitialised, true);
                 }
             }
         }
@@ -253,7 +253,7 @@ public final class SkyStarLightEngine extends StarLightEngine {
         final int chunkX = chunk.getPos().x;
         final int chunkZ = chunk.getPos().z;
         for (final ShortIterator iterator = sections.iterator(); iterator.hasNext();) {
-            final int y = (int)iterator.nextShort();
+            final int y = iterator.nextShort();
             this.checkNullSection(chunkX, y, chunkZ, true);
         }
 

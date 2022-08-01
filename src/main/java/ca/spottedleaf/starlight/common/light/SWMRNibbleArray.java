@@ -88,21 +88,11 @@ public final class SWMRNibbleArray {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("State: ");
         switch (this.stateVisible) {
-            case INIT_STATE_NULL:
-                stringBuilder.append("null");
-                break;
-            case INIT_STATE_UNINIT:
-                stringBuilder.append("uninitialised");
-                break;
-            case INIT_STATE_INIT:
-                stringBuilder.append("initialised");
-                break;
-            case INIT_STATE_HIDDEN:
-                stringBuilder.append("hidden");
-                break;
-            default:
-                stringBuilder.append("unknown");
-                break;
+            case INIT_STATE_NULL -> stringBuilder.append("null");
+            case INIT_STATE_UNINIT -> stringBuilder.append("uninitialised");
+            case INIT_STATE_INIT -> stringBuilder.append("initialised");
+            case INIT_STATE_HIDDEN -> stringBuilder.append("hidden");
+            default -> stringBuilder.append("unknown");
         }
         stringBuilder.append("\nData:\n");
 
@@ -357,17 +347,12 @@ public final class SWMRNibbleArray {
     // operation type: visible
     public DataLayer toVanillaNibble() {
         synchronized (this) {
-            switch (this.stateVisible) {
-                case INIT_STATE_HIDDEN:
-                case INIT_STATE_NULL:
-                    return null;
-                case INIT_STATE_UNINIT:
-                    return new DataLayer();
-                case INIT_STATE_INIT:
-                    return new DataLayer(this.storageVisible.clone());
-                default:
-                    throw new IllegalStateException();
-            }
+            return switch (this.stateVisible) {
+                case INIT_STATE_HIDDEN, INIT_STATE_NULL -> null;
+                case INIT_STATE_UNINIT -> new DataLayer();
+                case INIT_STATE_INIT -> new DataLayer(this.storageVisible.clone());
+                default -> throw new IllegalStateException();
+            };
         }
     }
 

@@ -252,8 +252,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
             for (;;) {
                 try {
                     return chunk.getLights().collect(Collectors.toList()).iterator();
-                } catch (final Exception cme) {
-                    continue;
+                } catch (final Exception ignored) {
                 }
             }
         }

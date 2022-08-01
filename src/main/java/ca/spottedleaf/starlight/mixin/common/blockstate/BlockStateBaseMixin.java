@@ -3,8 +3,6 @@ package ca.spottedleaf.starlight.mixin.common.blockstate;
 import ca.spottedleaf.starlight.common.blockstate.ExtendedAbstractBlockState;
 import com.google.common.collect.ImmutableMap;
 import com.mojang.serialization.MapCodec;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
