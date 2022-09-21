@@ -7,6 +7,7 @@ import ca.spottedleaf.starlight.common.world.ExtendedWorld;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.shorts.ShortCollection;
 import it.unimi.dsi.fastutil.shorts.ShortOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
@@ -21,7 +22,6 @@ import net.minecraft.world.level.lighting.LayerLightEventListener;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -642,7 +642,7 @@ public final class StarLightInterface {
 
         protected static final class ChunkTasks {
 
-            public final Set<BlockPos> changedPositions = new HashSet<>();
+            public final Set<BlockPos> changedPositions = new ObjectOpenHashSet<>();
             public Boolean[] changedSectionSet;
             public ShortOpenHashSet queuedEdgeChecksSky;
             public ShortOpenHashSet queuedEdgeChecksBlock;
