@@ -97,9 +97,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
             for (int dz = -1; dz <= 1; ++dz) {
                 ChunkHolder neighbour = world.getChunkSource().chunkMap.getUpdatingChunkIfPresent(CoordinateUtils.getChunkKey(dx + chunkX, dz + chunkZ));
                 if (neighbour != null) {
-                    neighbour.chunkToSave = neighbour.chunkToSave.thenCombine(updateFuture, (final ChunkAccess curr, final Void ignore) -> {
-                        return curr;
-                    });
+                    neighbour.chunkToSave = updateFuture.thenCompose(v -> neighbour.chunkToSave);
                 }
             }
         }
