@@ -90,20 +90,6 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
             world.getChunkSource().addRegionTicket(StarLightInterface.CHUNK_WORK_TICKET, pos, 0, pos);
         }
 
-        // append future to this chunk and 1 radius neighbours chunk save futures
-        // this prevents us from saving the world without first waiting for the light engine
-
-        for (int dx = -1; dx <= 1; ++dx) {
-            for (int dz = -1; dz <= 1; ++dz) {
-                ChunkHolder neighbour = world.getChunkSource().chunkMap.getUpdatingChunkIfPresent(CoordinateUtils.getChunkKey(dx + chunkX, dz + chunkZ));
-                if (neighbour != null) {
-                    neighbour.chunkToSave = neighbour.chunkToSave.thenCombine(updateFuture, (final ChunkAccess curr, final Void ignore) -> {
-                        return curr;
-                    });
-                }
-            }
-        }
-
         updateFuture.thenAcceptAsync((final Void ignore) -> {
             final int newReferences = this.chunksBeingWorkedOn.get(key);
             if (newReferences == 1) {
