@@ -20,37 +20,35 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
 import net.minecraft.world.level.lighting.LevelLightEngine;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 public final class StarLightInterface {
 
-    public static final TicketType<ChunkPos> CHUNK_WORK_TICKET = TicketType.create("starlight_chunk_work_ticket", (p1, p2) -> Long.compare(p1.toLong(), p2.toLong()));
+    public static final TicketType<ChunkPos> CHUNK_WORK_TICKET = TicketType.create("starlight_chunk_work_ticket", Comparator.comparingLong(ChunkPos::toLong));
 
     /**
      * Can be {@code null}, indicating the light is all empty.
      */
-    protected final Level world;
-    protected final LightChunkGetter lightAccess;
+    private final Level world;
+    private final LightChunkGetter lightAccess;
 
-    protected final ArrayDeque<SkyStarLightEngine> cachedSkyPropagators;
-    protected final ArrayDeque<BlockStarLightEngine> cachedBlockPropagators;
+    private final ArrayDeque<SkyStarLightEngine> cachedSkyPropagators;
+    private final ArrayDeque<BlockStarLightEngine> cachedBlockPropagators;
 
-    protected final LightQueue lightQueue = new LightQueue(this);
+    private final LightQueue lightQueue = new LightQueue(this);
 
-    protected final LayerLightEventListener skyReader;
-    protected final LayerLightEventListener blockReader;
-    protected final boolean isClientSide;
+    private final LayerLightEventListener skyReader;
+    private final LayerLightEventListener blockReader;
+    private final boolean isClientSide;
 
-    protected final int minSection;
-    protected final int maxSection;
-    protected final int minLightSection;
-    protected final int maxLightSection;
+    private final int minSection;
+    private final int maxSection;
+    private final int minLightSection;
+    private final int maxLightSection;
 
     public final LevelLightEngine lightEngine;
 
@@ -184,7 +182,7 @@ public final class StarLightInterface {
         };
     }
 
-    protected int getSkyLightValue(final BlockPos blockPos, final ChunkAccess chunk) {
+    private int getSkyLightValue(final BlockPos blockPos, final ChunkAccess chunk) {
         if (!this.hasSkyLight) {
             return 0;
         }
@@ -254,7 +252,7 @@ public final class StarLightInterface {
         return 15;
     }
 
-    protected int getBlockLightValue(final BlockPos blockPos, final ChunkAccess chunk) {
+    private int getBlockLightValue(final BlockPos blockPos, final ChunkAccess chunk) {
         if (!this.hasBlockLight) {
             return 0;
         }
@@ -320,7 +318,7 @@ public final class StarLightInterface {
         return this.lightAccess;
     }
 
-    protected final SkyStarLightEngine getSkyLightEngine() {
+    private SkyStarLightEngine getSkyLightEngine() {
         if (this.cachedSkyPropagators == null) {
             return null;
         }
@@ -335,7 +333,7 @@ public final class StarLightInterface {
         return ret;
     }
 
-    protected final void releaseSkyLightEngine(final SkyStarLightEngine engine) {
+    private void releaseSkyLightEngine(final SkyStarLightEngine engine) {
         if (this.cachedSkyPropagators == null) {
             return;
         }
@@ -344,7 +342,7 @@ public final class StarLightInterface {
         }
     }
 
-    protected final BlockStarLightEngine getBlockLightEngine() {
+    private BlockStarLightEngine getBlockLightEngine() {
         if (this.cachedBlockPropagators == null) {
             return null;
         }
@@ -359,7 +357,7 @@ public final class StarLightInterface {
         return ret;
     }
 
-    protected final void releaseBlockLightEngine(final BlockStarLightEngine engine) {
+    private void releaseBlockLightEngine(final BlockStarLightEngine engine) {
         if (this.cachedBlockPropagators == null) {
             return;
         }
@@ -561,8 +559,8 @@ public final class StarLightInterface {
 
     protected static final class LightQueue {
 
-        protected final Long2ObjectLinkedOpenHashMap<ChunkTasks> chunkTasks = new Long2ObjectLinkedOpenHashMap<>();
-        protected final StarLightInterface manager;
+        private final Long2ObjectLinkedOpenHashMap<ChunkTasks> chunkTasks = new Long2ObjectLinkedOpenHashMap<>();
+        private final StarLightInterface manager;
 
         public LightQueue(final StarLightInterface manager) {
             this.manager = manager;
@@ -584,7 +582,7 @@ public final class StarLightInterface {
             if (tasks.changedSectionSet == null) {
                 tasks.changedSectionSet = new Boolean[this.manager.maxSection - this.manager.minSection + 1];
             }
-            tasks.changedSectionSet[pos.getY() - this.manager.minSection] = Boolean.valueOf(newEmptyValue);
+            tasks.changedSectionSet[pos.getY() - this.manager.minSection] = newEmptyValue;
 
             return tasks.onComplete;
         }

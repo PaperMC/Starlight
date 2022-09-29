@@ -40,7 +40,7 @@ public abstract class StarLightEngine {
             AxisDirection.POSITIVE_Z, AxisDirection.NEGATIVE_Z
     };
 
-    protected static enum AxisDirection {
+    protected enum AxisDirection {
 
         // Declaration order is important and relied upon. Do not change without modifying propagation code.
         POSITIVE_X(1, 0, 0), NEGATIVE_X(-1, 0, 0),
@@ -53,7 +53,7 @@ public abstract class StarLightEngine {
             POSITIVE_Y.opposite = NEGATIVE_Y; NEGATIVE_Y.opposite = POSITIVE_Y;
         }
 
-        protected AxisDirection opposite;
+        AxisDirection opposite;
 
         public final int x;
         public final int y;
@@ -67,9 +67,9 @@ public abstract class StarLightEngine {
             this.y = y;
             this.z = z;
             this.nms = Direction.fromNormal(x, y, z);
-            this.everythingButThisDirection = (long)(ALL_DIRECTIONS_BITSET ^ (1 << this.ordinal()));
+            this.everythingButThisDirection = ALL_DIRECTIONS_BITSET ^ (1 << this.ordinal());
             // positive is always even, negative is always odd. Flip the 1 bit to get the negative direction.
-            this.everythingButTheOppositeDirection = (long)(ALL_DIRECTIONS_BITSET ^ (1 << (this.ordinal() ^ 1)));
+            this.everythingButTheOppositeDirection = ALL_DIRECTIONS_BITSET ^ (1 << (this.ordinal() ^ 1));
         }
 
         public AxisDirection getOpposite() {
@@ -757,7 +757,7 @@ public abstract class StarLightEngine {
                 final LevelChunkSection section = this.getChunkSection(chunkX, sectionIndex + this.minSection, chunkZ);
                 emptinessChanges[sectionIndex] = valueBoxed = section == null || section.hasOnlyAir() ? Boolean.TRUE : Boolean.FALSE;
             }
-            chunkEmptinessMap[sectionIndex] = valueBoxed.booleanValue();
+            chunkEmptinessMap[sectionIndex] = valueBoxed;
         }
 
         // now init neighbour nibbles
@@ -768,7 +768,7 @@ public abstract class StarLightEngine {
                 continue;
             }
 
-            final boolean empty = valueBoxed.booleanValue();
+            final boolean empty = valueBoxed;
 
             if (empty) {
                 continue;
@@ -1070,10 +1070,8 @@ public abstract class StarLightEngine {
         long[] queue = this.increaseQueue;
         if (idx >= queue.length) {
             queue = this.resizeIncreaseQueue();
-            queue[idx] = value;
-        } else {
-            queue[idx] = value;
         }
+        queue[idx] = value;
     }
 
     protected final void appendToDecreaseQueue(final long value) {
@@ -1081,10 +1079,8 @@ public abstract class StarLightEngine {
         long[] queue = this.decreaseQueue;
         if (idx >= queue.length) {
             queue = this.resizeDecreaseQueue();
-            queue[idx] = value;
-        } else {
-            queue[idx] = value;
         }
+        queue[idx] = value;
     }
 
     protected static final AxisDirection[][] OLD_CHECK_DIRECTIONS = new AxisDirection[1 << 6][];
@@ -1165,10 +1161,8 @@ public abstract class StarLightEngine {
                                         ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                                 | ((targetLevel & 0xFL) << (6 + 6 + 16))
                                                 | (propagate.everythingButTheOppositeDirection << (6 + 6 + 16 + 4));
-                                continue;
                             }
                         }
-                        continue;
                     } else {
                         this.mutablePos1.set(offX, offY, offZ);
                         long flags = 0;
@@ -1200,7 +1194,6 @@ public abstract class StarLightEngine {
                                             | (propagate.everythingButTheOppositeDirection << (6 + 6 + 16 + 4))
                                             | (flags);
                         }
-                        continue;
                     }
                 }
             } else {
@@ -1247,10 +1240,8 @@ public abstract class StarLightEngine {
                                         ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                                 | ((targetLevel & 0xFL) << (6 + 6 + 16))
                                                 | (propagate.everythingButTheOppositeDirection << (6 + 6 + 16 + 4));
-                                continue;
                             }
                         }
-                        continue;
                     } else {
                         this.mutablePos1.set(offX, offY, offZ);
                         long flags = 0;
@@ -1282,7 +1273,6 @@ public abstract class StarLightEngine {
                                             | (propagate.everythingButTheOppositeDirection << (6 + 6 + 16 + 4))
                                             | (flags);
                         }
-                        continue;
                     }
                 }
             }
@@ -1375,9 +1365,7 @@ public abstract class StarLightEngine {
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((targetLevel & 0xFL) << (6 + 6 + 16))
                                             | ((propagate.everythingButTheOppositeDirection) << (6 + 6 + 16 + 4));
-                            continue;
                         }
-                        continue;
                     } else {
                         this.mutablePos1.set(offX, offY, offZ);
                         long flags = 0;
@@ -1431,7 +1419,6 @@ public abstract class StarLightEngine {
                                             | ((propagate.everythingButTheOppositeDirection) << (6 + 6 + 16 + 4))
                                             | flags;
                         }
-                        continue;
                     }
                 }
             } else {
@@ -1504,9 +1491,7 @@ public abstract class StarLightEngine {
                                     ((offX + (offZ << 6) + (offY << 12) + encodeOffset) & ((1L << (6 + 6 + 16)) - 1))
                                             | ((targetLevel & 0xFL) << (6 + 6 + 16))
                                             | ((propagate.everythingButTheOppositeDirection) << (6 + 6 + 16 + 4));
-                            continue;
                         }
-                        continue;
                     } else {
                         this.mutablePos1.set(offX, offY, offZ);
                         long flags = 0;
@@ -1560,7 +1545,6 @@ public abstract class StarLightEngine {
                                             | ((propagate.everythingButTheOppositeDirection) << (6 + 6 + 16 + 4))
                                             | flags;
                         }
-                        continue;
                     }
                 }
             }

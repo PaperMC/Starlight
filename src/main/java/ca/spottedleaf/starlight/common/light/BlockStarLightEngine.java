@@ -85,7 +85,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
     }
 
     @Override
-    protected final void checkBlock(final LightChunkGetter lightAccess, final int worldX, final int worldY, final int worldZ) {
+    protected void checkBlock(final LightChunkGetter lightAccess, final int worldX, final int worldY, final int worldZ) {
         // blocks can change opacity
         // blocks can change emitted light
         // blocks can change direction of propagation
@@ -122,8 +122,8 @@ public final class BlockStarLightEngine extends StarLightEngine {
         // re-propagating neighbours (done by the decrease queue) will also account for opacity changes in this block
     }
 
-    protected final BlockPos.MutableBlockPos recalcCenterPos = new BlockPos.MutableBlockPos();
-    protected final BlockPos.MutableBlockPos recalcNeighbourPos = new BlockPos.MutableBlockPos();
+    private final BlockPos.MutableBlockPos recalcCenterPos = new BlockPos.MutableBlockPos();
+    private final BlockPos.MutableBlockPos recalcNeighbourPos = new BlockPos.MutableBlockPos();
 
     @Override
     protected int calculateLightValue(final LightChunkGetter lightAccess, final int worldX, final int worldY, final int worldZ,
@@ -203,7 +203,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
         this.performLightDecrease(lightAccess);
     }
 
-    protected Iterator<BlockPos> getSources(final LightChunkGetter lightAccess, final ChunkAccess chunk) {
+    private Iterator<BlockPos> getSources(final LightChunkGetter lightAccess, final ChunkAccess chunk) {
         if (chunk instanceof ImposterProtoChunk || chunk instanceof LevelChunk) {
             // implementation on Chunk is pretty awful, so write our own here. The big optimisation is
             // skipping empty sections, and the far more optimised reading of types.
@@ -242,8 +242,7 @@ public final class BlockStarLightEngine extends StarLightEngine {
             for (;;) {
                 try {
                     return chunk.getLights().collect(Collectors.toList()).iterator();
-                } catch (final Exception cme) {
-                    continue;
+                } catch (final Exception ignored) {
                 }
             }
         }

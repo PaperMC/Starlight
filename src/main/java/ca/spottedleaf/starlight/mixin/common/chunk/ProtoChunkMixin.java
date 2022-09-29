@@ -5,7 +5,6 @@ import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import net.minecraft.core.Registry;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
-import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.chunk.UpgradeData;
@@ -28,9 +27,6 @@ public abstract class ProtoChunkMixin implements ExtendedChunk {
             at = @At("TAIL")
     )
     public void onConstruct(ChunkPos chunkPos, UpgradeData upgradeData, LevelChunkSection[] levelChunkSections, ProtoChunkTicks protoChunkTicks, ProtoChunkTicks protoChunkTicks2, LevelHeightAccessor levelHeightAccessor, Registry registry, BlendingData blendingData, CallbackInfo ci) {
-        if ((Object)this instanceof ImposterProtoChunk) {
-            return;
-        }
         this.setBlockNibbles(StarLightEngine.getFilledEmptyLight(levelHeightAccessor));
         this.setSkyNibbles(StarLightEngine.getFilledEmptyLight(levelHeightAccessor));
     }

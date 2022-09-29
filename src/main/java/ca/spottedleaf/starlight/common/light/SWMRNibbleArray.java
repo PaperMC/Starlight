@@ -17,10 +17,10 @@ public final class SWMRNibbleArray {
      * Initialised nibble - Has light data.
      */
 
-    protected static final int INIT_STATE_NULL   = 0; // null
-    protected static final int INIT_STATE_UNINIT = 1; // uninitialised
-    protected static final int INIT_STATE_INIT   = 2; // initialised
-    protected static final int INIT_STATE_HIDDEN = 3; // initialised, but conversion to Vanilla data should be treated as if NULL
+    private static final int INIT_STATE_NULL   = 0; // null
+    private static final int INIT_STATE_UNINIT = 1; // uninitialised
+    private static final int INIT_STATE_INIT   = 2; // initialised
+    private static final int INIT_STATE_HIDDEN = 3; // initialised, but conversion to Vanilla data should be treated as if NULL
 
     public static final int ARRAY_SIZE = 16 * 16 * 16 / (8/4); // blocks / bytes per block
     // this allows us to maintain only 1 byte array when we're not updating
@@ -49,12 +49,12 @@ public final class SWMRNibbleArray {
         }
     }
 
-    protected int stateUpdating;
-    protected volatile int stateVisible;
+    private int stateUpdating;
+    private volatile int stateVisible;
 
-    protected byte[] storageUpdating;
-    protected boolean updatingDirty; // only returns whether storageUpdating is dirty
-    protected volatile byte[] storageVisible;
+    private byte[] storageUpdating;
+    private boolean updatingDirty; // only returns whether storageUpdating is dirty
+    private volatile byte[] storageVisible;
 
     public SWMRNibbleArray() {
         this(null, false); // lazy init
@@ -88,21 +88,11 @@ public final class SWMRNibbleArray {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("State: ");
         switch (this.stateVisible) {
-            case INIT_STATE_NULL:
-                stringBuilder.append("null");
-                break;
-            case INIT_STATE_UNINIT:
-                stringBuilder.append("uninitialised");
-                break;
-            case INIT_STATE_INIT:
-                stringBuilder.append("initialised");
-                break;
-            case INIT_STATE_HIDDEN:
-                stringBuilder.append("hidden");
-                break;
-            default:
-                stringBuilder.append("unknown");
-                break;
+            case INIT_STATE_NULL -> stringBuilder.append("null");
+            case INIT_STATE_UNINIT -> stringBuilder.append("uninitialised");
+            case INIT_STATE_INIT -> stringBuilder.append("initialised");
+            case INIT_STATE_HIDDEN -> stringBuilder.append("hidden");
+            default -> stringBuilder.append("unknown");
         }
         stringBuilder.append("\nData:\n");
 
@@ -147,7 +137,7 @@ public final class SWMRNibbleArray {
         }
     }
 
-    protected static boolean isAllZero(final byte[] data) {
+    private static boolean isAllZero(final byte[] data) {
         for (int i = 0; i < (ARRAY_SIZE >>> 4); ++i) {
             byte whole = data[i << 4];
 
@@ -306,7 +296,7 @@ public final class SWMRNibbleArray {
     }
 
     // operation type: updating
-    protected void swapUpdatingAndMarkDirty() {
+    private void swapUpdatingAndMarkDirty() {
         if (this.updatingDirty) {
             return;
         }
@@ -357,17 +347,12 @@ public final class SWMRNibbleArray {
     // operation type: visible
     public DataLayer toVanillaNibble() {
         synchronized (this) {
-            switch (this.stateVisible) {
-                case INIT_STATE_HIDDEN:
-                case INIT_STATE_NULL:
-                    return null;
-                case INIT_STATE_UNINIT:
-                    return new DataLayer();
-                case INIT_STATE_INIT:
-                    return new DataLayer(this.storageVisible.clone());
-                default:
-                    throw new IllegalStateException();
-            }
+            return switch (this.stateVisible) {
+                case INIT_STATE_HIDDEN, INIT_STATE_NULL -> null;
+                case INIT_STATE_UNINIT -> new DataLayer();
+                case INIT_STATE_INIT -> new DataLayer(this.storageVisible.clone());
+                default -> throw new IllegalStateException();
+            };
         }
     }
 

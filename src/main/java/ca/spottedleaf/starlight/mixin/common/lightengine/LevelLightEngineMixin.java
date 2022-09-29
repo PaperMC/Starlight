@@ -1,19 +1,14 @@
 package ca.spottedleaf.starlight.mixin.common.lightengine;
 
-import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
-import ca.spottedleaf.starlight.common.light.StarLightEngine;
 import ca.spottedleaf.starlight.common.light.StarLightInterface;
 import ca.spottedleaf.starlight.common.light.StarLightLightingProvider;
-import ca.spottedleaf.starlight.common.util.CoordinateUtils;
-import ca.spottedleaf.starlight.common.util.WorldUtil;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LightChunkGetter;
@@ -172,63 +167,17 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
     @Override
     public void clientUpdateLight(final LightLayer lightType, final SectionPos pos,
                                   final DataLayer nibble, final boolean trustEdges) {
-        if (((Object)this).getClass() != LevelLightEngine.class) {
-            throw new IllegalStateException("This hook is for the CLIENT ONLY");
-        }
+        throw new IllegalStateException("This hook is for the CLIENT ONLY");
         // data storage changed with new light impl
-        final ChunkAccess chunk = this.getLightEngine().getAnyChunkNow(pos.getX(), pos.getZ());
-        switch (lightType) {
-            case BLOCK: {
-                final SWMRNibbleArray[] blockNibbles = this.blockLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
-                    return StarLightEngine.getFilledEmptyLight(this.lightEngine.getWorld());
-                });
-
-                blockNibbles[pos.getY() - WorldUtil.getMinLightSection(this.lightEngine.getWorld())] = SWMRNibbleArray.fromVanilla(nibble);
-
-                if (chunk != null) {
-                    ((ExtendedChunk)chunk).setBlockNibbles(blockNibbles);
-                    this.lightEngine.getLightAccess().onLightUpdate(LightLayer.BLOCK, pos);
-                }
-                break;
-            }
-            case SKY: {
-                final SWMRNibbleArray[] skyNibbles = this.skyLightMap.computeIfAbsent(CoordinateUtils.getChunkKey(pos), (final long keyInMap) -> {
-                    return StarLightEngine.getFilledEmptyLight(this.lightEngine.getWorld());
-                });
-
-                skyNibbles[pos.getY() - WorldUtil.getMinLightSection(this.lightEngine.getWorld())] = SWMRNibbleArray.fromVanilla(nibble);
-
-                if (chunk != null) {
-                    ((ExtendedChunk)chunk).setSkyNibbles(skyNibbles);
-                    this.lightEngine.getLightAccess().onLightUpdate(LightLayer.SKY, pos);
-                }
-                break;
-            }
-        }
     }
 
     @Override
     public void clientRemoveLightData(final ChunkPos chunkPos) {
-        if (((Object)this).getClass() != LevelLightEngine.class) {
-            throw new IllegalStateException("This hook is for the CLIENT ONLY");
-        }
-        this.blockLightMap.remove(CoordinateUtils.getChunkKey(chunkPos));
-        this.skyLightMap.remove(CoordinateUtils.getChunkKey(chunkPos));
+        throw new IllegalStateException("This hook is for the CLIENT ONLY");
     }
 
     @Override
     public void clientChunkLoad(final ChunkPos pos, final LevelChunk chunk) {
-        if (((Object)this).getClass() != LevelLightEngine.class) {
-            throw new IllegalStateException("This hook is for the CLIENT ONLY");
-        }
-        final long key = CoordinateUtils.getChunkKey(pos);
-        final SWMRNibbleArray[] blockNibbles = this.blockLightMap.get(key);
-        final SWMRNibbleArray[] skyNibbles = this.skyLightMap.get(key);
-        if (blockNibbles != null) {
-            ((ExtendedChunk)chunk).setBlockNibbles(blockNibbles);
-        }
-        if (skyNibbles != null) {
-            ((ExtendedChunk)chunk).setSkyNibbles(skyNibbles);
-        }
+        throw new IllegalStateException("This hook is for the CLIENT ONLY");
     }
 }
