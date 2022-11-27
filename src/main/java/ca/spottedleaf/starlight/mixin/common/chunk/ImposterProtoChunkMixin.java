@@ -3,6 +3,7 @@ package ca.spottedleaf.starlight.mixin.common.chunk;
 import ca.spottedleaf.starlight.common.light.SWMRNibbleArray;
 import ca.spottedleaf.starlight.common.chunk.ExtendedChunk;
 import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.ProtoChunk;
@@ -19,7 +20,7 @@ public abstract class ImposterProtoChunkMixin extends ProtoChunk implements Exte
     private LevelChunk wrapped;
 
     public ImposterProtoChunkMixin(final LevelChunk levelChunk, final boolean bl) {
-        super(levelChunk.getPos(), UpgradeData.EMPTY, levelChunk, levelChunk.getLevel().registryAccess().registryOrThrow(Registry.BIOME_REGISTRY), levelChunk.getBlendingData());
+        super(levelChunk.getPos(), UpgradeData.EMPTY, levelChunk, levelChunk.getLevel().registryAccess().registryOrThrow(Registries.BIOME), levelChunk.getBlendingData());
     }
 
     @Override
