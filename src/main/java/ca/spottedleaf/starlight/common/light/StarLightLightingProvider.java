@@ -8,13 +8,13 @@ import net.minecraft.world.level.chunk.LevelChunk;
 
 public interface StarLightLightingProvider {
 
-    public StarLightInterface getLightEngine();
+    StarLightInterface getLightEngine();
 
-    public void clientUpdateLight(final LightLayer lightType, final SectionPos pos,
+    void clientUpdateLight(final LightLayer lightType, final SectionPos pos,
                                   final DataLayer nibble, final boolean trustEdges);
 
-    public void clientRemoveLightData(final ChunkPos chunkPos);
+    void clientRemoveLightData(final ChunkPos chunkPos);
 
-    public void clientChunkLoad(final ChunkPos pos, final LevelChunk chunk);
+    void clientChunkLoad(final ChunkPos pos, final LevelChunk chunk);
 
 }

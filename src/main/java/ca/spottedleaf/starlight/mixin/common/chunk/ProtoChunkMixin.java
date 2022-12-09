@@ -28,9 +28,6 @@ public abstract class ProtoChunkMixin implements ExtendedChunk {
             at = @At("TAIL")
     )
     public void onConstruct(ChunkPos chunkPos, UpgradeData upgradeData, LevelChunkSection[] levelChunkSections, ProtoChunkTicks protoChunkTicks, ProtoChunkTicks protoChunkTicks2, LevelHeightAccessor levelHeightAccessor, Registry registry, BlendingData blendingData, CallbackInfo ci) {
-        if ((Object)this instanceof ImposterProtoChunk) {
-            return;
-        }
         this.setBlockNibbles(StarLightEngine.getFilledEmptyLight(levelHeightAccessor));
         this.setSkyNibbles(StarLightEngine.getFilledEmptyLight(levelHeightAccessor));
     }

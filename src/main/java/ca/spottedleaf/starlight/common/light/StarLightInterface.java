@@ -20,17 +20,15 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
 import net.minecraft.world.level.lighting.LevelLightEngine;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 
 public final class StarLightInterface {
 
-    public static final TicketType<ChunkPos> CHUNK_WORK_TICKET = TicketType.create("starlight_chunk_work_ticket", (p1, p2) -> Long.compare(p1.toLong(), p2.toLong()));
+    public static final TicketType<ChunkPos> CHUNK_WORK_TICKET = TicketType.create("starlight_chunk_work_ticket", Comparator.comparingLong(ChunkPos::toLong));
 
     /**
      * Can be {@code null}, indicating the light is all empty.
@@ -584,7 +582,7 @@ public final class StarLightInterface {
             if (tasks.changedSectionSet == null) {
                 tasks.changedSectionSet = new Boolean[this.manager.maxSection - this.manager.minSection + 1];
             }
-            tasks.changedSectionSet[pos.getY() - this.manager.minSection] = Boolean.valueOf(newEmptyValue);
+            tasks.changedSectionSet[pos.getY() - this.manager.minSection] = newEmptyValue;
 
             return tasks.onComplete;
         }
