@@ -103,7 +103,7 @@ jar {
     manifest {
         attributes([
                 "Implementation-Title": "${modid}",
-                "Implementation-Version": "${version}",
+                "Implementation-Version": "${archiveVersion}",
                 "Implementation-Vendor": "${modid}",
                 "MixinConfigs": "${modid}.mixins.json",
                 "MixinConnector":"ca.spottedleaf.starlight.mixin.MixinConnector"
