@@ -82,7 +82,7 @@ the neighbour to the target level it will do one of two things:
  decrease and then incorrectly propagated).
 
 If you want far more depth about how decreases work, you can
-check out [this blog](https://www.seedofandromeda.com/blogs/29-fast-flood-fill-lighting-in-a-blocky-voxel-game-pt-1).
+check out [this blog](https://web.archive.org/web/20210622035752/https://www.seedofandromeda.com/blogs/29-fast-flood-fill-lighting-in-a-blocky-voxel-game-pt-1).
 I personally found it useful as I was struggling to figure out how to
 propagate light decreases (specifically, how to perform light updates after 
 chunks were lit).
