@@ -66,7 +66,7 @@ public abstract class StarLightEngine {
             this.x = x;
             this.y = y;
             this.z = z;
-            this.nms = Direction.fromNormal(x, y, z);
+            this.nms = Direction.fromDelta(x, y, z);
             this.everythingButThisDirection = (long)(ALL_DIRECTIONS_BITSET ^ (1 << this.ordinal()));
             // positive is always even, negative is always odd. Flip the 1 bit to get the negative direction.
             this.everythingButTheOppositeDirection = (long)(ALL_DIRECTIONS_BITSET ^ (1 << (this.ordinal() ^ 1)));

@@ -205,66 +205,47 @@ public final class BlockStarLightEngine extends StarLightEngine {
         this.performLightDecrease(lightAccess);
     }
 
-    protected Iterator<BlockPos> getSources(final LightChunkGetter lightAccess, final ChunkAccess chunk) {
-        if (chunk instanceof ImposterProtoChunk || chunk instanceof LevelChunk) {
-            // implementation on Chunk is pretty awful, so write our own here. The big optimisation is
-            // skipping empty sections, and the far more optimised reading of types.
-            List<BlockPos> sources = new ArrayList<>();
+    protected List<BlockPos> getSources(final LightChunkGetter lightAccess, final ChunkAccess chunk) {
+        final List<BlockPos> sources = new ArrayList<>();
 
-            int offX = chunk.getPos().x << 4;
-            int offZ = chunk.getPos().z << 4;
+        final int offX = chunk.getPos().x << 4;
+        final int offZ = chunk.getPos().z << 4;
 
-            final LevelChunkSection[] sections = chunk.getSections();
-            for (int sectionY = this.minSection; sectionY <= this.maxSection; ++sectionY) {
-                final LevelChunkSection section = sections[sectionY - this.minSection];
-                if (section == null || section.hasOnlyAir()) {
-                    // no sources in empty sections
-                    continue;
-                }
-                final PalettedContainer<BlockState> states = section.states;
-                final int offY = sectionY << 4;
-
-                for (int index = 0; index < (16 * 16 * 16); ++index) {
-                    final BlockState state = states.get(index);
-                    if (((ExtendedAbstractBlockState)state).getOpacityIfCached() == -1) {
-                        // Forge
-                        this.mutablePos1.set(offX | (index & 15), offY | (index >>> 8), offZ | ((index >>> 4) & 15));
-                        if (state.getLightEmission(lightAccess.getLevel(), this.mutablePos1) <= 0) {
-                            continue;
-                        }
-                    } else {
-                        if (state.getLightEmission() <= 0) {
-                            continue;
-                        }
-                    }
-
-                    // index = x | (z << 4) | (y << 8)
-                    sources.add(new BlockPos(offX | (index & 15), offY | (index >>> 8), offZ | ((index >>> 4) & 15)));
-                }
+        final LevelChunkSection[] sections = chunk.getSections();
+        for (int sectionY = this.minSection; sectionY <= this.maxSection; ++sectionY) {
+            final LevelChunkSection section = sections[sectionY - this.minSection];
+            if (section == null || section.hasOnlyAir()) {
+                // no sources in empty sections
+                continue;
             }
+            // Forge - need to check each state getLightEmission
+            final PalettedContainer<BlockState> states = section.states;
+            final int offY = sectionY << 4;
 
-            return sources.iterator();
-        } else {
-            // world gen and lighting run in parallel, and if lighting keeps up it can be lighting chunks that are
-            // being generated. In the nether, lava will add a lot of sources. This resulted in quite a few CME crashes.
-            // So all we do spinloop until we can collect a list of sources, and even if it is out of date we will pick up
-            // the missing sources from checkBlock.
-            for (;;) {
-                try {
-                    return chunk.getLights().collect(Collectors.toList()).iterator();
-                } catch (final Exception cme) {
+            for (int index = 0; index < (16 * 16 * 16); ++index) {
+                final BlockState state = states.get(index);
+                // Forge start - use correct getLightEmission
+                this.mutablePos1.set(offX | (index & 15), offY | (index >>> 8), offZ | ((index >>> 4) & 15));
+                if (state.getLightEmission(lightAccess.getLevel(), this.mutablePos1) <= 0) {
                     continue;
                 }
+                // Forge end - use correct getLightEmission
+
+                // index = x | (z << 4) | (y << 8)
+                sources.add(new BlockPos(offX | (index & 15), offY | (index >>> 8), offZ | ((index >>> 4) & 15)));
             }
         }
+
+        return sources;
     }
 
     @Override
     public void lightChunk(final LightChunkGetter lightAccess, final ChunkAccess chunk, final boolean needsEdgeChecks) {
         // setup sources
         final int emittedMask = this.emittedLightMask;
-        for (final Iterator<BlockPos> positions = this.getSources(lightAccess, chunk); positions.hasNext();) {
-            final BlockPos pos = positions.next();
+        final List<BlockPos> positions = this.getSources(lightAccess, chunk);
+        for (int i = 0, len = positions.size(); i < len; ++i) {
+            final BlockPos pos = positions.get(i);
             final BlockState blockState = this.getBlockState(pos.getX(), pos.getY(), pos.getZ());
             final int emittedLight = blockState.getLightEmission(lightAccess.getLevel(), pos) & emittedMask; // Forge
 
