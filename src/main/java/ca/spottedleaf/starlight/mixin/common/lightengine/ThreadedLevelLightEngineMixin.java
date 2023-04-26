@@ -144,7 +144,16 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
      * @author Spottedleaf
      */
     @Overwrite
-    public void enableLightSources(final ChunkPos pos, final boolean lightEnabled) {
+    public void propagateLightSources(final ChunkPos pos) {
+        // handled by light()
+    }
+
+    /**
+     * @reason Avoid messing with the vanilla light engine state
+     * @author Spottedleaf
+     */
+    @Overwrite
+    public void setLightEnabled(final ChunkPos pos, final boolean lightEnabled) {
         // light impl does not need to do this
     }
 
@@ -154,8 +163,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
      * @author Spottedleaf
      */
     @Overwrite
-    public void queueSectionData(final LightLayer lightType, final SectionPos pos, final @Nullable DataLayer nibbles,
-                                 final boolean bl) {
+    public void queueSectionData(final LightLayer lightType, final SectionPos pos, final @Nullable DataLayer nibbles) {
         // load hooks inside ChunkSerializer
     }
 
@@ -166,6 +174,15 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
     @Overwrite
     public void retainData(final ChunkPos pos, final boolean retainData) {
         // light impl does not need to do this
+    }
+
+    /**
+     * @reason Starlight does not have to do this
+     * @author Spottedleaf
+     */
+    @Overwrite
+    public CompletableFuture<ChunkAccess> initializeLight(final ChunkAccess chunk, final boolean lit) {
+        return CompletableFuture.completedFuture(chunk);
     }
 
     /**

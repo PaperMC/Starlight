@@ -84,8 +84,8 @@ public final class StarLightInterface {
             }
 
             @Override
-            public void onBlockEmissionIncrease(final BlockPos blockPos, final int i) {
-                // skylight doesn't care
+            public void propagateLightSources(final ChunkPos chunkPos) {
+                throw new UnsupportedOperationException();
             }
 
             @Override
@@ -95,12 +95,12 @@ public final class StarLightInterface {
             }
 
             @Override
-            public int runUpdates(final int i, final boolean bl, final boolean bl2) {
+            public int runLightUpdates() {
                 throw new UnsupportedOperationException();
             }
 
             @Override
-            public void enableLightSources(final ChunkPos chunkPos, final boolean bl) {
+            public void setLightEnabled(final ChunkPos chunkPos, final boolean bl) {
                 throw new UnsupportedOperationException();
             }
 
@@ -141,8 +141,8 @@ public final class StarLightInterface {
             }
 
             @Override
-            public void onBlockEmissionIncrease(final BlockPos blockPos, final int i) {
-                this.checkBlock(blockPos);
+            public void propagateLightSources(final ChunkPos chunkPos) {
+                throw new UnsupportedOperationException();
             }
 
             @Override
@@ -152,12 +152,12 @@ public final class StarLightInterface {
             }
 
             @Override
-            public int runUpdates(final int i, final boolean bl, final boolean bl2) {
+            public int runLightUpdates() {
                 throw new UnsupportedOperationException();
             }
 
             @Override
-            public void enableLightSources(final ChunkPos chunkPos, final boolean bl) {
+            public void setLightEnabled(final ChunkPos chunkPos, final boolean bl) {
                 throw new UnsupportedOperationException();
             }
 
@@ -182,6 +182,14 @@ public final class StarLightInterface {
                 StarLightInterface.this.sectionChange(pos, notReady);
             }
         };
+    }
+
+    public boolean hasSkyLight() {
+        return this.hasSkyLight;
+    }
+
+    public boolean hasBlockLight() {
+        return this.hasBlockLight;
     }
 
     protected int getSkyLightValue(final BlockPos blockPos, final ChunkAccess chunk) {

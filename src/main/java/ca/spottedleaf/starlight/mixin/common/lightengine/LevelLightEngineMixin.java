@@ -17,9 +17,9 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LightChunkGetter;
-import net.minecraft.world.level.lighting.LayerLightEngine;
 import net.minecraft.world.level.lighting.LayerLightEventListener;
 import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.world.level.lighting.LightEngine;
 import net.minecraft.world.level.lighting.LightEventListener;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
@@ -35,11 +35,11 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
 
     @Shadow
     @Nullable
-    private LayerLightEngine<?, ?> blockEngine;
+    private LightEngine<?, ?> blockEngine;
 
     @Shadow
     @Nullable
-    private LayerLightEngine<?, ?> skyEngine;
+    private LightEngine<?, ?> skyEngine;
 
     @Unique
     protected StarLightInterface lightEngine;
@@ -79,15 +79,6 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
     }
 
     /**
-     * @reason Avoid messing with vanilla light engine state
-     * @author Spottedleaf
-     */
-    @Overwrite
-    public void onBlockEmissionIncrease(final BlockPos pos, final int level) {
-        // this light engine only reads levels from blocks, so this is a no-op
-    }
-
-    /**
      * @reason Route to new light engine
      * @author Spottedleaf
      */
@@ -102,7 +93,7 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
      * @author Spottedleaf
      */
     @Overwrite
-    public int runUpdates(final int maxUpdateCount, final boolean doSkylight, final boolean skipEdgeLightPropagation) {
+    public int runLightUpdates() {
         // replace impl
         final boolean hadUpdates = this.hasLightWork();
         this.lightEngine.propagateChanges();
@@ -123,8 +114,17 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
      * @author Spottedleaf
      */
     @Overwrite
-    public void enableLightSources(final ChunkPos pos, final boolean lightEnabled) {
+    public void setLightEnabled(final ChunkPos pos, final boolean lightEnabled) {
+        // not invoked by the client
+    }
 
+    /**
+     * @reason Avoid messing with the vanilla light engine state
+     * @author Spottedleaf
+     */
+    @Overwrite
+    public void propagateLightSources(ChunkPos param0) {
+        // not invoked by the client
     }
 
     /**
@@ -141,8 +141,19 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
      * @author Spottedleaf
      */
     @Overwrite
-    public void queueSectionData(final LightLayer lightType, final SectionPos pos, @Nullable final DataLayer nibble,
-                                 final boolean trustEdges) {}
+    public void queueSectionData(final LightLayer lightType, final SectionPos pos, @Nullable final DataLayer nibble) {
+        // do not allow modification of data from the non-chunk load hooks
+    }
+
+    /**
+     * @reason Avoid messing with the vanilla light engine state
+     * @author Spottedleaf
+     */
+    @Overwrite
+    public String getDebugData(final LightLayer lightType, final SectionPos pos) {
+        // TODO would be nice to make use of this
+        return "n/a";
+    }
 
     /**
      * @reason Avoid messing with the vanilla light engine state
@@ -161,6 +172,16 @@ public abstract class LevelLightEngineMixin implements LightEventListener, StarL
     public int getRawBrightness(final BlockPos pos, final int ambientDarkness) {
         // need to use new light hooks for this
         return this.lightEngine.getRawBrightness(pos, ambientDarkness);
+    }
+
+    /**
+     * @reason Need to use our own hooks for checking this state
+     * @author Spottedleaf
+     */
+    @Overwrite
+    public boolean lightOnInSection(final SectionPos pos) {
+        final long key = CoordinateUtils.getChunkKey(pos.getX(), pos.getZ());
+        return (!this.lightEngine.hasBlockLight() || this.blockLightMap.get(key) != null) && (!this.lightEngine.hasSkyLight() || this.skyLightMap.get(key) != null);
     }
 
     @Unique
