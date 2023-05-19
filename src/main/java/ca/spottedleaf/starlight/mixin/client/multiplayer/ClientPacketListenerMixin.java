@@ -99,13 +99,12 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
     @Redirect(
             method = "handleLevelChunkWithLight",
             at = @At(
-                    target = "Lnet/minecraft/client/multiplayer/ClientPacketListener;queueLightUpdate(IILnet/minecraft/network/protocol/game/ClientboundLightUpdatePacketData;)V",
+                    target = "Lnet/minecraft/client/multiplayer/ClientLevel;queueLightUpdate(Ljava/lang/Runnable;)V",
                     value = "INVOKE",
                     ordinal = 0
             )
     )
-    private void postChunkLoadHookRedirect(final ClientPacketListener clientPacketListener, final int chunkX, final int chunkZ,
-                                           final ClientboundLightUpdatePacketData clientboundLightUpdatePacketData) {
+    private void postChunkLoadHookRedirect(final ClientLevel instance, final Runnable runnable) {
         // don't call vanilla's logic, see below
     }
 
