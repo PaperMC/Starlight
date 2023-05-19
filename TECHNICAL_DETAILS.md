@@ -1,5 +1,15 @@
 Starlight Technical Details
 ==
+
+## Obsoletion notice
+
+Given the 1.20 Vanilla light engine copies basically everything from
+Starlight in this document and then some, the comparisons to Vanilla
+and Phosphor are invalid. This document is then only valid for versions
+from 1.16 to 1.19.
+
+## Old intro
+
 First and foremost, Starlight is a Vanilla-like light engine. I've seen
 some people say it's not, however just because Starlight is fast enough
 to defeat typical "light suppressors" does not mean I break Vanilla lighting.
