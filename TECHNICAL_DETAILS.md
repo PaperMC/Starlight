@@ -6,7 +6,26 @@ Starlight Technical Details
 Given the 1.20 Vanilla light engine copies basically everything from
 Starlight in this document and then some, the comparisons to Vanilla
 and Phosphor are invalid. This document is then only valid for versions
-from 1.16 to 1.19.
+from 1.16 to 1.19. Updated tests results are posted in README.md only.
+
+## Notice about invalid gen test results
+In the vanilla light engine (both pre 1.20 from 1.14 and post 1.20) 
+it maintains the light data in a hashtable (section->nibble array) 
+and it updates this map via copy-on-write as the number of chunks 
+generated grows, so does the data in this hashtable, and so does 
+the time the copy-on-write operation takes. Depending on the GC flags, 
+this may result in "huge allocations" (which are directly allocated 
+into old gen on G1) which invoke a far more expensive GC operation.
+The GC operations may affect the gen test, but the copy-on-write operation
+seem to take up the majority of the time on the light engine post 1.20. 
+This basically invalidates the gen test for 1.20+. 
+
+Rather than re-evaluate the test on 1.19-, I have decided to leave 
+the test results removed.
+
+Given that getting any useful number out of the gen test takes generating
+10k chunks, for 1.20 the differences between Starlight and Vanilla are small
+enough to not matter. So, the gen test is not used for 1.20+ comparisons.
 
 ## Old intro
 
@@ -556,14 +575,9 @@ Tested versions:
 - Starlight 1.0.0-RC1
 
 Results:
-![Graph](https://i.imgur.com/5aI8Eaf.png)
-The graph above shows how much time the light engine was active
-while generating 10404 chunks.
+### See "Notice about invalid gen test results" at top of page
 
-![Graph 2](https://i.imgur.com/eukEXY6.png)
-The graph above shows how much time it took to generate the 10404 chunks.
-
-Raw output:
+Raw output (still see the result notice above):
 ```
 Starlight 1.0.0-RC1:
 [STDOUT]: Completed warmup with total cpu time 3421.875ms
