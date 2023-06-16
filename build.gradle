@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.2-SNAPSHOT'
+    id 'fabric-loom' version '1.2.7'
     id 'maven-publish'
 }
 
@@ -67,6 +67,12 @@ java {
 }
 jar {
     from "LICENSE"
+}
+
+// make build reproducible
+tasks.withType(AbstractArchiveTask) {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
 }
 
 // configure the maven publication
