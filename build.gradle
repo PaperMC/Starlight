@@ -1,17 +1,18 @@
 buildscript {
     repositories {
-        maven { url = 'https://files.minecraftforge.net/maven' }
         maven { url = 'https://repo.spongepowered.org/maven' }
-        mavenCentral()
     }
     dependencies {
-        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.1+', changing: true
         classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
     }
 }
 
-apply plugin: 'net.minecraftforge.gradle'
-apply plugin: 'org.spongepowered.mixin'
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
 
 /*
  * Gets the version name from the latest Git tag
@@ -26,114 +27,125 @@ def getGitCommit = { ->
     return stdout.toString().trim()
 }
 
-group = "ca.spottedleaf.${modid}"
+group = mod_group_id
 version = "${mod_version}" + "+forge." + getGitCommit()
-archivesBaseName = "${modid}"
+
+base {
+    archivesName = mod_id
+}
+
+apply plugin: 'org.spongepowered.mixin'
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 minecraft {
-    mappings channel: "${mappings_channel}", version: "${mappings_version}"
-    // makeObfSourceJar = false // an Srg named sources jar is made by default. uncomment this to disable.
+    mappings channel: mapping_channel, version: mapping_version
+    
+    copyIdeResources = true
 
     accessTransformer = file('src/main/resources/META-INF/accesstransformer.cfg')
 
     // Default run configurations.
     // These can be tweaked, removed, or duplicated as needed.
     runs {
-        client {
+        // applies to all the run configs below
+        configureEach {
             workingDirectory project.file('run')
 
             // add mixins
-            arg "--mixin.config=" + modid + ".mixins.json"
+            arg "--mixin.config=" + mod_id + ".mixins.json"
 
             // Recommended logging data for a userdev environment
-            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
+            // The markers can be added/remove as needed separated by commas.
+            // "SCAN": For mods scan.
+            // "REGISTRIES": For firing of registry events.
+            // "REGISTRYDUMP": For getting the contents of all registries.
+            property 'forge.logging.markers', 'REGISTRIES'
 
             // Recommended logging level for the console
+            // You can set various levels here.
+            // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
             property 'forge.logging.console.level', 'debug'
 
             mods {
-                starlight {
+                "${mod_id}" {
                     source sourceSets.main
                 }
             }
+        }
+
+        client {
+            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
+            property 'forge.enabledGameTestNamespaces', mod_id
         }
 
         server {
-            workingDirectory project.file('run')
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
 
-            // add mixins
-            arg "--mixin.config=" + modid + ".mixins.json"
-
-            // Recommended logging data for a userdev environment
-            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-
-            // Recommended logging level for the console
-            property 'forge.logging.console.level', 'debug'
-
-            mods {
-                starlight {
-                    source sourceSets.main
-                }
-            }
+        // This run config launches GameTestServer and runs all registered gametests, then exits.
+        // By default, the server will crash when no gametests are provided.
+        // The gametest system is also enabled by default for other run configs under the /test command.
+        gameTestServer {
+            property 'forge.enabledGameTestNamespaces', mod_id
         }
 
         data {
-            workingDirectory project.file('run')
+            // example of overriding the workingDirectory set in configureEach above
+            workingDirectory project.file('run-data')
 
-            // Recommended logging data for a userdev environment
-            property 'forge.logging.markers', 'SCAN,REGISTRIES,REGISTRYDUMP'
-
-            // Recommended logging level for the console
-            property 'forge.logging.console.level', 'debug'
-
-            args '--mod', '${modid}', '--all', '--output', file('src/generated/resources/')
-
-            mods {
-                starlight {
-                    source sourceSets.main
-                }
-            }
+            // Specify the modid for data generation, where to output the resulting resource, and where to look for existing resources.
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
         }
     }
 }
 
-jar {
-    manifest {
-        attributes([
-                "Implementation-Title": "${modid}",
-                "Implementation-Version": "${version}",
-                "Implementation-Vendor": "${modid}",
-                "MixinConfigs": "${modid}.mixins.json",
-                "MixinConnector":"ca.spottedleaf.starlight.mixin.MixinConnector"
-        ])
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
+            forge_version: forge_version, forge_version_range: forge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
+            mod_authors: mod_authors, mod_description: mod_description,
+            version: version
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
     }
 }
 
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1', // We are version 1 of ourselves
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'MixinConfigs'            : mod_id + '.mixins.json',
+                'MixinConnector'          : 'ca.spottedleaf.starlight.mixin.MixinConnector',
+        ])
+    }
+
+    // This is the preferred method to reobfuscate your jar file
+    finalizedBy 'reobfJar'
+}
+
 dependencies {
-    minecraft "net.minecraftforge:forge:${mc_version}-${forge_version}"
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
 }
 
 mixin {
-    add sourceSets.main, "${modid}.refmap.json"
+    add sourceSets.main, "${mod_id}.refmap.json"
 }
 
-
-processResources {
-    filesMatching("**/mods.toml") {
-        expand(
-                'modid':project.property('modid'),
-                'mod_version': project.property('mod_version'),
-                'version': project.version,
-                'forge_version': project.property('forge_version'),
-                'forge_version_major': project.property('forge_version_major'),
-                'mc_version': project.property('mc_version'),
-                'mappings_channel': project.property('mappings_channel'),
-                'mappings_version': project.property('mappings_version')
-        )
-    }
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
-
-jar.finalizedBy('reobfJar')

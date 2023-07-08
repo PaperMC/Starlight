@@ -1,28 +1,26 @@
 modLoader = "javafml"
-loaderVersion = "[${forge_version_major},)"
-license = "LGPL-3.0-only"
+loaderVersion = "${loader_version_range}"
+license = "${mod_license}"
 
 [[mods]]
- modId = "starlight"
+ modId = "${mod_id}"
  version = "${version}"
- displayName = "Starlight"
- authors = "Spottedleaf"
- description = '''
-    Rewrites the light engine to fix lighting performance and lighting errors
- '''
+ displayName = "${mod_name}"
+ authors = "${mod_authors}"
+ description = '''${mod_description}'''
  logoFile = "logo.png"
  displayURL = "https://www.curseforge.com/minecraft/mc-mods/starlight-forge"
 
- [[dependencies.starlight]]
+ [[dependencies.${mod_id}]]
   modId = "forge"
   mandatory = true
-  versionRange = "[41.0.35,)"
+  versionRange = "${forge_version_range}"
   ordering = "NONE"
   side = "BOTH"
 
-[[dependencies.starlight]]
+[[dependencies.${mod_id}]]
   modId = "minecraft"
   mandatory = true
-  versionRange = "[1.19, 1.20)"
+  versionRange = "${minecraft_version_range}"
   ordering = "NONE"
   side = "BOTH"
