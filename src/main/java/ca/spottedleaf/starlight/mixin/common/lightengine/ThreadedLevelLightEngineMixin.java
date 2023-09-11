@@ -50,7 +50,8 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
     private final Long2IntOpenHashMap chunksBeingWorkedOn = new Long2IntOpenHashMap();
 
     @Unique
-    private void queueTaskForSection(final int chunkX, final int chunkY, final int chunkZ, final Supplier<CompletableFuture<Void>> runnable) {
+    private void queueTaskForSection(final int chunkX, final int chunkY, final int chunkZ,
+                                     final Supplier<StarLightInterface.LightQueue.ChunkTasks> runnable) {
         final ServerLevel world = (ServerLevel)this.getLightEngine().getWorld();
 
         final ChunkAccess center = this.getLightEngine().getAnyChunkNow(chunkX, chunkZ);
@@ -77,12 +78,18 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
 
         final long key = CoordinateUtils.getChunkKey(chunkX, chunkZ);
 
-        final CompletableFuture<Void> updateFuture = runnable.get();
+        final StarLightInterface.LightQueue.ChunkTasks updateFuture = runnable.get();
 
         if (updateFuture == null) {
             // not scheduled
             return;
         }
+
+        if (updateFuture.isTicketAdded) {
+            // ticket already added
+            return;
+        }
+        updateFuture.isTicketAdded = true;
 
         final int references = this.chunksBeingWorkedOn.addTo(key, 1);
         if (references == 0) {
@@ -90,7 +97,7 @@ public abstract class ThreadedLevelLightEngineMixin extends LevelLightEngine imp
             world.getChunkSource().addRegionTicket(StarLightInterface.CHUNK_WORK_TICKET, pos, 0, pos);
         }
 
-        updateFuture.thenAcceptAsync((final Void ignore) -> {
+        updateFuture.onComplete.thenAcceptAsync((final Void ignore) -> {
             final int newReferences = this.chunksBeingWorkedOn.get(key);
             if (newReferences == 1) {
                 this.chunksBeingWorkedOn.remove(key);
