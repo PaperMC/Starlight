@@ -90,7 +90,7 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
             )
     )
     private void unloadLightDataHook(final ClientPacketListener instance, final ClientboundForgetLevelChunkPacket clientboundForgetLevelChunkPacket) {
-        ((StarLightLightingProvider)this.level.getChunkSource().getLightEngine()).clientRemoveLightData(new ChunkPos(clientboundForgetLevelChunkPacket.getX(), clientboundForgetLevelChunkPacket.getZ()));
+        ((StarLightLightingProvider)this.level.getChunkSource().getLightEngine()).clientRemoveLightData(new ChunkPos(clientboundForgetLevelChunkPacket.pos().x, clientboundForgetLevelChunkPacket.pos().z));
     }
 
     /**
@@ -121,14 +121,14 @@ public abstract class ClientPacketListenerMixin implements ClientGamePacketListe
     private void postChunkLoadHook(final ClientboundLevelChunkWithLightPacket clientboundLevelChunkWithLightPacket, final CallbackInfo ci) {
         final int chunkX = clientboundLevelChunkWithLightPacket.getX();
         final int chunkZ = clientboundLevelChunkWithLightPacket.getZ();
-        final LevelChunk chunk = (LevelChunk)this.level.getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
+        final LevelChunk chunk = this.level.getChunkSource().getChunk(chunkX, chunkZ, ChunkStatus.FULL, false);
         if (chunk == null) {
             // failed to load
             return;
         }
         // load in light data from packet immediately
         this.applyLightData(chunkX, chunkZ, clientboundLevelChunkWithLightPacket.getLightData());
-        ((StarLightLightingProvider) this.level.getChunkSource().getLightEngine()).clientChunkLoad(new ChunkPos(chunkX, chunkZ), chunk);
+        ((StarLightLightingProvider)this.level.getChunkSource().getLightEngine()).clientChunkLoad(new ChunkPos(chunkX, chunkZ), chunk);
 
         // we need this for the update chunk status call, so that it can tell starlight what sections are empty and such
         this.enableChunkLight(chunk, chunkX, chunkZ);
