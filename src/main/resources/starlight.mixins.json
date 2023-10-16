@@ -14,7 +14,8 @@
     "common.lightengine.ThreadedLevelLightEngineMixin",
     "common.world.ChunkSerializerMixin",
     "common.world.LevelMixin",
-    "common.world.ServerWorldMixin"
+    "common.world.ServerWorldMixin",
+    "common.world.WorldGenRegionMixin"
   ],
   "client": [
     "client.multiplayer.ClientPacketListenerMixin",
