@@ -35,6 +35,12 @@ dependencies {
     neoForge "net.neoforged:neoforge:${forge_version}"
 }
 
+// make build reproducible
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
 tasks.named('processResources', ProcessResources).configure {
     var replaceProperties = [
             minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
