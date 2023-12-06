@@ -9,10 +9,10 @@ license = "${mod_license}"
  authors = "${mod_authors}"
  description = '''${mod_description}'''
  logoFile = "logo.png"
- displayURL = "https://www.curseforge.com/minecraft/mc-mods/starlight-forge"
+ displayURL = "https://www.curseforge.com/minecraft/mc-mods/starlight-neoforge"
 
  [[dependencies.${mod_id}]]
-  modId = "forge"
+  modId = "neoforge"
   mandatory = true
   versionRange = "${forge_version_range}"
   ordering = "NONE"

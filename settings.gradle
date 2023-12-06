@@ -1,9 +1,29 @@
 pluginManagement {
     repositories {
         gradlePluginPortal()
+        mavenCentral()
         maven {
-            name = 'MinecraftForge'
-            url = 'https://maven.minecraftforge.net/'
+            // Mirrors NeoForged & Fabric
+            name = "Paper"
+            url = 'https://repo.papermc.io/repository/maven-public/'
+        }
+        maven {
+            name = "Architectury"
+            url = 'https://maven.architectury.dev/'
+        }
+    }
+}
+
+// todo: Can remove this block when updating foojay conventions
+buildscript {
+    configurations.all {
+        resolutionStrategy {
+            eachDependency {
+                if (requested.group == "com.google.code.gson" && requested.name == "gson") {
+                    useVersion("2.10.1")
+                    because("project plugins need newer version than foojay toolchains")
+                }
+            }
         }
     }
 }
