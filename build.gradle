@@ -3,6 +3,11 @@ plugins {
     id 'maven-publish'
 }
 
+loom.runs.all {
+    // https://github.com/SpongePowered/Mixin/wiki/Mixin-Java-System-Properties
+    vmArg("-Dmixin.debug=true")
+}
+
 /*
  * Gets the version name from the latest Git tag
  */
