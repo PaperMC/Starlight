@@ -1,4 +1,4 @@
-Starlight (Forge)
+Starlight (NeoForge)
 ==
 Forge mod for completely rewriting the vanilla light engine.
 
@@ -6,8 +6,8 @@ Forge mod for completely rewriting the vanilla light engine.
 At this point in Starlight's development, I expect problems with mod conflicts.
 
 ## Download
-[CurseForge (Forge)](https://www.curseforge.com/minecraft/mc-mods/starlight-forge)
-[Modrinth (Forge)](https://modrinth.com/mod/starlight-forge)
+[CurseForge (NeoForge)](https://www.curseforge.com/minecraft/mc-mods/starlight-neoforge)
+[Modrinth (NeoForge)](https://modrinth.com/mod/starlight-neoforge)
 
 ## Contact
 [Discord](https://discord.gg/tuinity)
