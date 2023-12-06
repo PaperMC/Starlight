@@ -67,6 +67,11 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+loom.runs.all {
+    // https://github.com/SpongePowered/Mixin/wiki/Mixin-Java-System-Properties
+    vmArg("-Dmixin.debug=true")
+}
+
 /*
  * Gets the version name from the latest Git tag
  */
