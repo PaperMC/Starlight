@@ -24,3 +24,6 @@ license = "${mod_license}"
   versionRange = "${minecraft_version_range}"
   ordering = "NONE"
   side = "BOTH"
+
+[[mixins]]
+config = "starlight.mixins.json"
