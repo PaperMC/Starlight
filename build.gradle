@@ -1,5 +1,5 @@
 plugins {
-    id 'dev.architectury.loom' version '1.4-SNAPSHOT'
+    id 'dev.architectury.loom' version '1.4.373'
 }
 
 group = mod_group_id
