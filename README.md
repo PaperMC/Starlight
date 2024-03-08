@@ -2,8 +2,9 @@ Starlight (Fabric)
 ==
 Fabric mod for completely rewriting the vanilla light engine.
 
-## Known Issues
-At this point in Starlight's development, I expect problems with mod conflicts.
+## Future updates past 1.20
+Please see: https://gist.github.com/Spottedleaf/6cc1acdd03a9b7ac34699bf5e8f1b85c
+This project will not receive further updates for the foreseeable future.
 
 ## Download
 [CurseForge (Fabric)](https://www.curseforge.com/minecraft/mc-mods/starlight)
